@@ -1,0 +1,14 @@
+# Spring Boot & Java
+target/
+build/
+*.class
+*.jar
+*.war
+*.log
+
+# IntelliJ & Gradle
+.idea/
+*.iml
+*.iws
+out/
+.gradle/
