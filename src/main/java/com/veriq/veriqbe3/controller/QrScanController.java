@@ -17,8 +17,8 @@ public class QrScanController {
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE) //multipart_form_data 제한
     public ResponseEntity<QrScanResponse> uploadQrImage(    //반환 http body 타입 제한
-            @RequestHeader(value = "guest_uuid", required = false ) String guestUuid,
-            @RequestParam("image") MultipartFile image) {
+        @RequestHeader(value = "guest_uuid", required = false ) String guestUuid,
+        @RequestParam("image") MultipartFile image) {
         try {
             QrScanResponse response = processQrScan.toFront(image, guestUuid);
             return ResponseEntity.ok(response);
