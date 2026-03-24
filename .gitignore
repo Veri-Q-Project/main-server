@@ -12,3 +12,5 @@ build/
 *.iws
 out/
 .gradle/
+# 비밀번호가 담긴 설정 파일은 제외
+src/main/resources/application.yml
