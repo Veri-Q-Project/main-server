@@ -14,6 +14,7 @@ import java.io.InputStream;
 @Component
 public class QrDecoder {
     public String decode(MultipartFile file) throws Exception {
+        System.out.println(">>> 8081에 도착한 파일 크기: " + file.getSize()); // 이게 0이면 전송 실패!
         try (InputStream inputStream = file.getInputStream()) {                 //raw data로 저장
             BufferedImage bufferedImage = ImageIO.read(inputStream);            //raw data를 이미지 객체로 변환
             if (bufferedImage == null) {                                        //이미지가 아닌 경우 예외처리

@@ -25,12 +25,12 @@ public class SecurityService {
 
     /**
      * 유저의 요청이 허용 범위 내에 있는지 확인합니다.
-     * @param guestId 사용자 식별자
+     * @param guestUuid 사용자 식별자
      * @return 허용 여부 (true: 통과, false: 캡차 필요)
      */
-    public boolean isAllowed(String guestId) {
+    public boolean isAllowed(String guestUuid) {
         // Redis에 저장할 키 이름 (예: limit:user-1234)
-        String key = "limit:" + guestId;
+        String key = "limit:" + guestUuid;
 
         // Redis에서 현재 카운트 값을 가져옴
         String val = redisTemplate.opsForValue().get(key);
@@ -56,8 +56,8 @@ public class SecurityService {
     /**
      * 캡차 인증에 성공했을 때, 해당 유저의 요청 횟수 기록을 지워줍니다.
      */
-    public void resetCount(String guestId) {
-        redisTemplate.delete("limit:" + guestId);
+    public void resetCount(String guestUuid) {
+        redisTemplate.delete("limit:" + guestUuid);
     }
     public boolean verifyWithGoogle(String captchaToken) {
         // 구글 API는 폼 데이터 형식을 원합니다.
