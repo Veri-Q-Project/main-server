@@ -8,7 +8,7 @@
       attributes:
         label: "어떤 문제가 있나요?"
         description: "기존 기능에서 불편한 점이나, 해결하고 싶은 문제 상황을 설명해 주세요."
-        placeholder: "예: 현재는 스킨 종류가 부족하여 특정 앱의 딥링크를 인식하지 못합니다."
+        placeholder:
       validations:
         required: true
     - type: textarea
@@ -16,7 +16,7 @@
       attributes:
         label: "어떤 기능이 추가되면 좋을까요?"
         description: "제안하시는 해결 방안이나 새로운 기능을 자세히 설명해 주세요."
-        placeholder: "예: Instagram이나 Twitter 전용 딥링크 패턴을 SchemeClassifier에 추가해 주세요."
+        placeholder:
       validations:
         required: true
     - type: checkboxes

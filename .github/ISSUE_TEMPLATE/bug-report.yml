@@ -14,7 +14,7 @@
         label: "실행 환경"
         options:
           - Local (localhost)
-          - Remote (10.204.xxx)
+          - Remote
     - type: textarea
       id: description
       attributes:
