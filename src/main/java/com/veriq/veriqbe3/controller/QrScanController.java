@@ -20,8 +20,8 @@ public class QrScanController {
         @RequestHeader(value = "guest_uuid", required = false ) String guestUuid,
         @RequestParam("image") MultipartFile image) {
         try {
-            QrScanResponse response = processQrScan.toFront(image, guestUuid);
-            return ResponseEntity.ok(response);
+            QrScanResponse response = processQrScan.process(image, guestUuid);
+               return ResponseEntity.ok(response);
 
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();
