@@ -12,7 +12,7 @@ public class SchemeClassifier {
 
     // 1. 웹url(http/https 생략된 도메인 형태 포함)
     private static final Pattern WEB_URL_PATTERN = Pattern.compile(
-            "^(https?://)?([\\da-z.-]+)\\.([a-z.]{2,6})([/\\w .-]*)*/?$",   //http생략한 경우 포함, 한글자 도메인 이름 포함
+            "^(https?://)?([\\da-z.-]+)\\.([a-z.]{2,})([/\\w .-?&#=]*)*/?$",   //http생략한 경우 포함, 한글자 도메인 이름 포함, query/fragment 허용, TLD 길이 제한 없음
             Pattern.CASE_INSENSITIVE
     );
 
@@ -36,9 +36,9 @@ public class SchemeClassifier {
             Pattern.CASE_INSENSITIVE
     );
 
-    // 5. WI-FI - WIFI:T:WPA;S:MyNetwork;P:password;;
+    // 5. WI-FI - WIFI:T:WPA;S:MyNetwork;P:password;; (S and T can appear in any order, P is optional)
     private static final Pattern WIFI_PATTERN = Pattern.compile(
-            "^WIFI:S:[^;]+;T:[^;]+;P:[^;]+;;$",
+            "^WIFI:(?=.*S:[^;]+)(?=.*T:[^;]+)(?:S:[^;]+;|T:[^;]+;|P:[^;]+;){2,3};$",
             Pattern.CASE_INSENSITIVE
     );
 
@@ -54,7 +54,19 @@ public class SchemeClassifier {
             Pattern.CASE_INSENSITIVE
     );
 
-    // 8. 일반 딥 링크 (특정 앱 실행용 커스텀 스킴 instagram:)
+    // 8. 이메일 (mailto:user@example.com)
+    private static final Pattern EMAIL_PATTERN = Pattern.compile(
+            "^mailto:[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+            Pattern.CASE_INSENSITIVE
+    );
+
+    // 9. 앱 스토어 (market://..., itms-apps://...)
+    private static final Pattern APP_STORE_PATTERN = Pattern.compile(
+            "^(market|itms-apps)://.*$",
+            Pattern.CASE_INSENSITIVE
+    );
+
+    // 10. 일반 딥 링크 (특정 앱 실행용 커스텀 스킴 instagram:)
     private static final Pattern DEEP_LINK_PATTERN = Pattern.compile(
             "^[a-z][a-z0-9+-.]*://.*$",
             Pattern.CASE_INSENSITIVE
@@ -81,6 +93,18 @@ public class SchemeClassifier {
         if (telMatcher.matches()) {
             String phoneNum = trimmed.replaceFirst("(?i)tel:", "");
             return new ClassificationResult(SchemeType.TEL, phoneNum, false);
+        }
+
+        Matcher emailMatcher = EMAIL_PATTERN.matcher(trimmed);
+        if (emailMatcher.matches()) {
+            String email = trimmed.replaceFirst("(?i)mailto:", "");
+            return new ClassificationResult(SchemeType.EMAIL, email, false);
+        }
+
+        Matcher appStoreMatcher = APP_STORE_PATTERN.matcher(trimmed);
+        if (appStoreMatcher.matches()) {
+            String storeUri = trimmed.replaceFirst("(?i)(market|itms-apps)://", "");
+            return new ClassificationResult(SchemeType.APP_STORE, storeUri, false);
         }
 
         if (WEB_URL_PATTERN.matcher(trimmed).matches()) {
