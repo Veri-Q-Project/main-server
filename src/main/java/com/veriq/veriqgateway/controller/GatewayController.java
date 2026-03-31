@@ -22,7 +22,7 @@ public class GatewayController {
     // 🔗 고근 님(BE 3) 서버의 실제 API 주소
     // 실전에서는 localhost 대신 도커 네트워크 서비스 명칭을 쓰기도 하지만,
     // 지금은 로컬 테스트용으로 작성했습니다.
-    private final String BE3_URL = "http://localhost:8081/api/v1/scan/upload";
+    private final String BE3_URL = "http://localhost:8083/api/v1/scan/upload";
 
     /**
      * [POST] /api/v1/scan
@@ -31,7 +31,7 @@ public class GatewayController {
      */
     @PostMapping(value = "/scan", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ScanResponse> processScan(
-            @RequestHeader("guestUuid") String guestUuid,
+            @RequestHeader("guest_uuid") String guestUuid,
             @RequestParam("image") MultipartFile image) {
 
         // --- [STEP 1] 보안 검사 (Redis 연동) ---
@@ -65,6 +65,7 @@ public class GatewayController {
 
             // 전송할 헤더 설정
             HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
 
             //headers.setContentType(MediaType.MULTIPART_FORM_DATA);
             headers.set("guest_uuid", guestUuid); // BE3 서버도 누가 보냈는지 알아야 함
