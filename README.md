@@ -18,7 +18,7 @@
 
 
 
-```text
+
 [ Client (React) ] 
        │
        ▼ (HTTP/HTTPS)
