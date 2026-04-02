@@ -47,7 +47,7 @@
 ## 🛠 Tech Stack
 Veri-Q 게이트웨이 서버에 사용된 핵심 기술 스택입니다.
 
-* **Language**: Java 17
+* **Language**: Java 21
 * **Framework**: Spring Boot 3.x
 * **Security**: 
     * [cite_start]Google reCAPTCHA v2 (사용자 인증 및 봇 차단) 
@@ -81,6 +81,56 @@ Veri-Q 게이트웨이 서버에 사용된 핵심 기술 스택입니다.
     * Docker 이미지 빌드 및 컨테이너 원격 재시작 스크립트 작성 예정
 
 ---
-### **📍 상세 작업 히스토리**
+### ** 상세 작업 히스토리**
 > **Note**: `analysis-engine` 파트와 발맞추어 API 및 DB 조회 로직의 정규화 작업을 병행하고 있습니다.
+>
+
+# Veri-Q 서버 접속 및 개발 가이드
+
+상민 팀장이 구축한 GCP 서버 인프라를 사용하기 위한 가이드입니다.
+
+## 🌐 서버 정보
+- **공통 외부 IP**: `34.64.218.236`
+
+### 서비스별 포트
+| 서비스 | 포트 | 용도 |
+| :--- | :--- | :--- |
+| **Spring BE1** | `8081` | Gateway 서버 |
+| **Spring BE3** | `8083` | Platform/Data Hub 서버 |
+| **FastAPI** | `8000` | 분석 엔진 서버 |
+| **MySQL** | `3306` | 데이터베이스 |
+| **Redis** | `6379` | 캐시 서버 |
+
+---
+## 🛠️ 팀원별 환경 설정 가이드 (로컬 개발용)
+
+> **공통 외부 IP**: `34.64.218.236`  
+> 모든 팀원은 로컬에서 테스트할 때 아래 설정값을 참조하여 접속 정보를 수정해 주세요.
+
+---
+
+### **.🍃 Spring Boot, ⚡ FastAPI **
+`src/main/resources/application.yml`,`.env` 파일의 설정을 아래와 같이 수정합니다.
+
+
+```yaml
+spring:
+  datasource:
+    # GCP MySQL 연결 설정
+    url: jdbc:mysql://34.64.218.236:3306/veriq_db?serverTimezone=Asia/Seoul
+    username: root
+    password: [카톡방에 공유된 비밀번호]
+  data:
+    redis:
+      # GCP Redis 연결 설정
+      host: 34.64.218.236
+      port: 6379
+
+--- env
+# Database 연결 정보
+DB_URL = "mysql+pymysql://root:[비밀번호]@34.64.218.236:3306/veriq_db"
+
+# Redis 연결 정보
+REDIS_HOST = "34.64.218.236"
+REDIS_PORT = 6379
 
