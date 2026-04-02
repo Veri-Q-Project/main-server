@@ -30,13 +30,13 @@
 spring:
   datasource:
     # GCP MySQL 연결 설정
-    url: jdbc:mysql://34.64.218.236:3306/veriq_db?serverTimezone=Asia/Seoul
+    url: jdbc:mysql://veriq-db:3306/veriq_db?serverTimezone=Asia/Seoul
     username: root
     password: [카톡방에 공유된 비밀번호]
   data:
     redis:
       # GCP Redis 연결 설정
-      host: 34.64.218.236
+      host: veriq-redis
       port: 6379
 
 --- env
