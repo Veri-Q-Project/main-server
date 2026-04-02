@@ -47,7 +47,7 @@
 ## 🛠 Tech Stack
 Veri-Q 게이트웨이 서버에 사용된 핵심 기술 스택입니다.
 
-* **Language**: Java 17
+* **Language**: Java 21
 * **Framework**: Spring Boot 3.x
 * **Security**: 
     * [cite_start]Google reCAPTCHA v2 (사용자 인증 및 봇 차단) 
@@ -62,8 +62,8 @@ Veri-Q 게이트웨이 서버에 사용된 핵심 기술 스택입니다.
 ## 🔗 API Documentation
 프론트엔드 및 타 서버와의 원활한 협업을 위해 Swagger를 통한 자동화된 API 문서를 제공합니다.
 
-* **Swagger UI**: [http://[GCP_EXTERNAL_IP]:8081/swagger-ui/index.html](http://[GCP_EXTERNAL_IP]:8081/swagger-ui/index.html)
-> **Note**: `[GCP_EXTERNAL_IP]` 부분은 아직 서버 구축이 안되어서 GCP서버 구축이 되면 업데이트 하겠습니다
+* **Swagger UI**: [http://[34.64.218.236]:8081/swagger-ui/index.html](http://[GCP_EXTERNAL_IP]:8081/swagger-ui/index.html)
+
 
 ## 🚧 현재 진행 상황: BE1 (Gateway & Security)
 현재 **Veri-Q** 게이트웨이 서버의 핵심 보안 인프라를 구축하고 있으며, 단계별 구현 상황은 다음과 같습니다.
@@ -71,7 +71,7 @@ Veri-Q 게이트웨이 서버에 사용된 핵심 기술 스택입니다.
 ### **1. 진행 중 (In Progress) 🏗️**
 * **Redis 기반 Rate Limiting 구현**
     * Guest UUID별로 API 요청 횟수를 제한하여 서비스 가용성 확보
-    * 현재 로컬 테스트  및 GCP 운영 환경 적용 중
+    * 현재 로컬 테스트  및 GCP 서버 연동 완료
 * **Google reCAPTCHA v2 인증 연동**
     * 임계치 초과 요청 시 사용자 인증 절차를 통한 봇(Bot) 접근 원천 차단
     * 프론트엔드와 인증 토큰 검증 로직 연동 준비중
@@ -83,4 +83,56 @@ Veri-Q 게이트웨이 서버에 사용된 핵심 기술 스택입니다.
 ---
 ### **📍 상세 작업 히스토리**
 > **Note**: `analysis-engine` 파트와 발맞추어 API 및 DB 조회 로직의 정규화 작업을 병행하고 있습니다.
+
+
+
+
+# 🚀 Veri-Q 서버 접속 및 개발 가이드
+
+ GCP 서버 인프라를 사용하기 위한 가이드입니다.
+
+## 🌐 서버 정보
+- **공통 외부 IP**: `34.64.218.236`
+
+### 서비스별 포트
+| 서비스 | 포트 | 용도 |
+| :--- | :--- | :--- |
+| **Spring BE1** | `8081` | Gateway 서버 |
+| **Spring BE3** | `8083` | Platform/Data Hub 서버 |
+| **FastAPI** | `8000` | 분석 엔진 서버 |
+| **MySQL** | `3306` | 데이터베이스 |
+| **Redis** | `6379` | 캐시 서버 |
+
+---
+
+## 🛠️ 팀원별 환경 설정 가이드 (로컬 개발용)
+
+> 모든 팀원은 본인 로컬 환경의 설정 파일(`.yml`, `.env`, `config.py` 등)을 아래 정보에 맞춰 수정해 주세요.
+
+---
+
+### **🍃 1. Spring Boot⚡ 2. FastAPI  (Analysis) **
+
+**파일**: `src/main/resources/application.yml`//.env나 config.py
+
+```yaml
+spring:
+  datasource:
+    # GCP 서버의 외부 IP와 DB 포트 사용
+    url: jdbc:mysql://34.64.218.236:3306/veriq_db?serverTimezone=Asia/Seoul
+    username: root
+    password: [카톡방에 공유된 비밀번호]
+  data:
+    redis:
+      host: 34.64.218.236
+      port: 6379
+
+fastapi 
+# GCP 서버의 DB 주소 설정
+DB_URL = "mysql+pymysql://root:[비밀번호]@34.64.218.236:3306/veriq_db"
+
+# GCP 서버의 Redis 주소 설정
+REDIS_HOST = "34.64.218.236"
+REDIS_PORT = 6379
+
 
