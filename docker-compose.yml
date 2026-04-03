@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  # 1. MySQL 데이터베이스
+  veriq-db:
+    image: mysql:8.0
+    container_name: veriq-db
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: veriq123
+      MYSQL_DATABASE: veriq_db
+    volumes:
+      - ./mysql_data:/var/lib/mysql
+
+  # 2. Redis 캐시 서버
+  veriq-redis:
+    image: redis:latest
+    container_name: veriq-redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  # 3. Spring BE1 (Gateway - 박상민 )
+  veriq-gateway:
+    image: eclipse-temurin:21-jdk
+    container_name: veriq-be1
+    restart: always
+    ports:
+      - "8081:8081"
+    depends_on:
+      - veriq-db
+      - veriq-redis
+
+  # 4. Spring BE3 (Platform/Data Hub)
+  veriq-platform:
+    image: eclipse-temurin:21-jdk
+    container_name: veriq-be3
+    restart: always
+    ports:
+      - "8083:8083"
+    depends_on:
+      - veriq-db
+      - veriq-redis
+
+  # 5. FastAPI (분석 엔진)
+  veriq-analysis:
+    image: python:3.9-slim
+    container_name: veriq-analysis
+    restart: always
+    ports:
+      - "8000:8000"
+    depends_on:
+      - veriq-db

@@ -18,7 +18,7 @@ public class ProcessQrScan {
     private final ScanHistoryRepository scanHistoryRepository;
 
     @Transactional // DB 저장 중 에러 발생 시 모든 작업을 롤백하기 위함
-    public QrScanResponse toFront(MultipartFile image, String guest_uuid) throws Exception {
+    public QrScanResponse process(MultipartFile image, String guest_uuid) throws Exception {
 
         String url = qrDecoder.decode(image);         //이미지 디코드
 
@@ -34,10 +34,14 @@ public class ProcessQrScan {
 
         String status = "COMPLETED";
 
-        //WEB이나 단축 URL이면 상태를 변경
+        //WEB이나 단축 URL이면
         if (result.type() == SchemeType.WEB || result.type() == SchemeType.SHORT_URL) {
-            status = "ANALYSIS_REQUIRED";
-
+            return QrScanResponse.builder()
+                    .guestUuid(guest_uuid)
+                    .schemeType(result.type())
+                    .typeInfo(result.typeInfo())
+                    .status("ANALYSIS_COMPLETED") // BE2 연동 후 실제 결과 상태로 변경
+                    .build();
         }
         return QrScanResponse.builder()
                 .guestUuid(guest_uuid)          // FE가 보낸 식별자
