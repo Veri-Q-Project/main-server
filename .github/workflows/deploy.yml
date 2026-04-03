@@ -23,4 +23,3 @@ jobs:
             chmod +x gradlew
             sudo ./gradlew bootJar
             sudo docker-compose up --build -d
-            sudo docker image prune -f
