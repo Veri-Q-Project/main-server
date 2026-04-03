@@ -19,5 +19,7 @@ jobs:
           key: ${{ secrets.GCP_SSH_KEY }}
           script: |
             cd /home/sk38808738
+            git pull origin develop
+            sudo ./gradlew bootJar
             sudo docker-compose pull
             sudo docker-compose up -d
