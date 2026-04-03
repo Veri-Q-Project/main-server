@@ -10,35 +10,41 @@ import java.util.regex.Pattern;
 @Component
 public class SchemeClassifier {
 
-    // 1. 웹url(http/https 생략된 도메인 형태 포함)
+    // 1. 웹 URL DoS 방지 및 특수문자 % 허용
     private static final Pattern WEB_URL_PATTERN = Pattern.compile(
-            "^(https?://)?([\\da-z.-]+)\\.([a-z.]{2,})([/\\w .-?&#=]*)*/?$",   //http생략한 경우 포함, 한글자 도메인 이름 포함, query/fragment 허용, TLD 길이 제한 없음
+            "^(https?://)?([\\da-z.-]+)\\.([a-z.]{2,})([/a-zA-Z0-9.~:?#@!$&'()*+,;=%-]*)$",
             Pattern.CASE_INSENSITIVE
     );
 
-    private static final List<String> SHORTENER_DOMAINS = List.of("bit.ly", "t.co", "goo.gl", "tinyurl.com");
+    // 단축 URL 확인을 위한 패턴 (정확히 호스트명에 해당하는지 검사하기 위함)
+    private static final List<Pattern> SHORTENER_PATTERNS = List.of(
+            Pattern.compile("^(https?://)?(www\\.)?bit\\.ly(/.*)?$", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("^(https?://)?(www\\.)?t\\.co(/.*)?$", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("^(https?://)?(www\\.)?goo\\.gl(/.*)?$", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("^(https?://)?(www\\.)?tinyurl\\.com(/.*)?$", Pattern.CASE_INSENSITIVE)
+    );
 
-    // 2. 2차 인증 (OTP) - otpauth://totp/Google:test@gmail.com?secret=...
+    // 2. 2차 인증 (OTP)
     private static final Pattern OTP_PATTERN = Pattern.compile(
             "^otpauth://(totp|hotp)/.*$",
             Pattern.CASE_INSENSITIVE
     );
 
-    // 3. 가상화폐 지갑 - bitcoin:1A1zP1eP...
+    // 3. 가상화폐 지갑 (?amount= 등 쿼리파라미터 허용)
     private static final Pattern CRYPTO_PATTERN = Pattern.compile(
-            "^(bitcoin|ethereum|litecoin|bitcoincash):[a-zA-Z0-9]+$",
+            "^(bitcoin|ethereum|litecoin|bitcoincash):[a-zA-Z0-9]+(\\?.*)?$",
             Pattern.CASE_INSENSITIVE
     );
 
-    // 4. SMS - sms:+821012345678?body=hello
+    // 4. SMS
     private static final Pattern SMS_PATTERN = Pattern.compile(
-            "^sms:(\\+?[0-9\\-]+)(\\?body=.*)?$",
+            "^sms:(\\+?[0-9\\-]+)(\\?.*)?$",
             Pattern.CASE_INSENSITIVE
     );
 
-    // 5. WI-FI - WIFI:T:WPA;S:MyNetwork;P:password;; (S and T can appear in any order, P is optional)
+    // 5. WI-FI (비밀번호가 없는 Open 네트워크도 존재할 수 있으므로 P:는 필수가 아님)
     private static final Pattern WIFI_PATTERN = Pattern.compile(
-            "^WIFI:(?=.*S:[^;]+)(?=.*T:[^;]+)(?:S:[^;]+;|T:[^;]+;|P:[^;]+;){2,3};$",
+            "^WIFI:.*(S:[^;]+).*;;?$",
             Pattern.CASE_INSENSITIVE
     );
 
@@ -48,25 +54,25 @@ public class SchemeClassifier {
             Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
-    // 7. 전화번호 (tel:01012345678 또는 순수 숫자 9~13자리)
+    // 7. 전화번호 (일반 유선, 국제번호 포함하여 유연하게 변경)
     private static final Pattern TEL_PATTERN = Pattern.compile(
-            "^(tel:)?((\\+?82|0)1[016789]-?\\d{3,4}-?\\d{4})$",
+            "^(tel:)?(\\+?[0-9\\-]{8,15})$",
             Pattern.CASE_INSENSITIVE
     );
 
-    // 8. 이메일 (mailto:user@example.com)
+    // 8. 이메일 (?subject= 등 쿼리파라미터 허용)
     private static final Pattern EMAIL_PATTERN = Pattern.compile(
-            "^mailto:[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+            "^mailto:[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}(\\?.*)?$",
             Pattern.CASE_INSENSITIVE
     );
 
-    // 9. 앱 스토어 (market://..., itms-apps://...)
+    // 9. 앱 스토어
     private static final Pattern APP_STORE_PATTERN = Pattern.compile(
             "^(market|itms-apps)://.*$",
             Pattern.CASE_INSENSITIVE
     );
 
-    // 10. 일반 딥 링크 (특정 앱 실행용 커스텀 스킴 instagram:)
+    // 10. 일반 딥 링크
     private static final Pattern DEEP_LINK_PATTERN = Pattern.compile(
             "^[a-z][a-z0-9+-.]*://.*$",
             Pattern.CASE_INSENSITIVE
@@ -80,8 +86,6 @@ public class SchemeClassifier {
         }
 
         String trimmed = rawText.strip();
-
-        // 형식이 명확한 순서로 검사
 
         if (OTP_PATTERN.matcher(trimmed).matches()) return new ClassificationResult(SchemeType.OTP, trimmed, false);
         if (CRYPTO_PATTERN.matcher(trimmed).matches()) return new ClassificationResult(SchemeType.CRYPTO, trimmed, false);
@@ -108,8 +112,9 @@ public class SchemeClassifier {
         }
 
         if (WEB_URL_PATTERN.matcher(trimmed).matches()) {
-            boolean isShortener = SHORTENER_DOMAINS.stream()
-                    .anyMatch(domain -> trimmed.toLowerCase().contains(domain));
+            // 정규식을 통해 정확히 도메인 형태가 단축 URL인지 판별
+            boolean isShortener = SHORTENER_PATTERNS.stream()
+                    .anyMatch(pattern -> pattern.matcher(trimmed).matches());
 
             if (isShortener) {
                 return new ClassificationResult(SchemeType.SHORT_URL, trimmed, true);
@@ -121,7 +126,6 @@ public class SchemeClassifier {
             return new ClassificationResult(SchemeType.DEEP_LINK, trimmed, false);
         }
 
-        // 그 외 일반 텍스트
         return new ClassificationResult(SchemeType.OTHER, trimmed, false);
     }
 }
