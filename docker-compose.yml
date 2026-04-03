@@ -29,6 +29,9 @@ services:
     restart: always
     ports:
       - "8081:8081"
+    volumes:
+      - /home/sk38808738/main-server/build/libs:/home/sk38808738/main-server/build/libs
+    entrypoint: [ "java", "-jar", "-Dspring.profiles.active=be1", "/home/sk38808738/main-server/build/libs/app.jar" ]
     depends_on:
       - veriq-db
       - veriq-redis
@@ -40,6 +43,9 @@ services:
     restart: always
     ports:
       - "8083:8083"
+    volumes:
+      - /home/sk38808738/main-server/build/libs:/home/sk38808738/main-server/build/libs
+    entrypoint: [ "java", "-jar", "-Dspring.profiles.active=be3", "/home/sk38808738/main-server/build/libs/app.jar" ]
     depends_on:
       - veriq-db
       - veriq-redis
