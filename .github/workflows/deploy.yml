@@ -1,0 +1,20 @@
+name: Veri-Q Develop Deploy
+
+on:
+  push:
+    branches: [ "develop","feat/KD-12" ] # main이 아니라 develop으로 수정!
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH Remote Commands
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.GCP_IP }}
+          username: ${{ secrets.GCP_USER }}
+          key: ${{ secrets.GCP_SSH_KEY }}
+          script: |
+            cd /home/sk38808738
+            sudo docker-compose pull
+            sudo docker-compose up -d
