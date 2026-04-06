@@ -61,11 +61,12 @@ REDIS_PORT = 6379
 
 ### **🍃 Spring Boot Dockerfile
 ```yaml
-FROM eclipse-temurin:21-jdk-jammy
-WORKDIR /app
-# 빌드된 JAR를 app.jar로 복사 (파일명에 상관없이 자동 매칭)
-COPY build/libs/*.jar app.jar
-ENTRYPOINT ["java", "-jar", "app.jar"]
+FROM eclipse-temurin:21-jdk
+ARG JAR_FILE=build/libs/*.jar
+COPY ${JAR_FILE} app.jar
+
+# 기본 실행 명령은 비워두거나 기본값 설정 (docker-compose에서 덮어씀)
+ENTRYPOINT ["java", "-jar", "/app.jar"]
 ```
 
 
@@ -149,6 +150,9 @@ services:
     restart: always
     ports:
       - "8081:8081"
+    volumes:
+      - /home/sk38808738/main-server/build/libs:/home/sk38808738/main-server/build/libs
+    entrypoint: [ "java", "-jar", "-Dspring.profiles.active=be1", "/home/sk38808738/main-server/build/libs/app.jar" ]
     depends_on:
       - veriq-db
       - veriq-redis
@@ -160,6 +164,9 @@ services:
     restart: always
     ports:
       - "8083:8083"
+    volumes:
+      - /home/sk38808738/main-server/build/libs:/home/sk38808738/main-server/build/libs
+    entrypoint: [ "java", "-jar", "-Dspring.profiles.active=be3", "/home/sk38808738/main-server/build/libs/app.jar" ]
     depends_on:
       - veriq-db
       - veriq-redis
