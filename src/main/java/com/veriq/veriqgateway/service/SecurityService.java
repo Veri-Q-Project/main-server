@@ -25,39 +25,43 @@ public class SecurityService {
 
     /**
      * 유저의 요청이 허용 범위 내에 있는지 확인합니다.
-     * @param guestUuid 사용자 식별자
+     * @param clinetIp 사용자 식별자
      * @return 허용 여부 (true: 통과, false: 캡차 필요)
      */
-    public boolean isAllowed(String guestUuid) {
-        // Redis에 저장할 키 이름 (예: limit:user-1234)
-        String key = "limit:" + guestUuid;
+    public boolean isAllowed(String clinetIp) {
+        // Redis에 저장할 키 이름 (limit+ip)
+        String key = "limit:" + clinetIp;
+        // 1. [원자적 연산] 읽기 + 비교하기 전에 무조건 1을 먼저 증가시킵니다.
+        // Redis는 자체적으로 동시성을 제어하므로, 이 연산은 절대 꼬이지 않습니다.
+        Long currentCount = redisTemplate.opsForValue().increment(key);
 
-        // Redis에서 현재 카운트 값을 가져옴
-        String val = redisTemplate.opsForValue().get(key);
-        int count = (val == null) ? 0 : Integer.parseInt(val);
-
-        // 1. 요청 횟수가 제한치(5회)에 도달했는지 확인
-        if (count >= LIMIT) {
-            return false; // 더 이상 허용하지 않음
+        if (currentCount == null) {
+            return false; // Redis 에러 대비 안전 장치
         }
 
-        // 2. 카운트 증가 처리
-        if (count == 0) {
-            // 처음 요청하는 경우, 1을 저장하고 1시간 후 자동 삭제(TTL) 설정
-            redisTemplate.opsForValue().set(key, "1", Duration.ofHours(1));
-        } else {
-            // 이미 기록이 있는 경우 카운트만 1 증가
-            redisTemplate.opsForValue().increment(key);
+        // 2. 만약 방금 증가시킨 결과가 1이라면 (최초 요청이라면)
+        if (currentCount == 1L) {
+            // 1시간 뒤에 기록이 사라지도록 타이머(TTL)를 설정합니다.
+            redisTemplate.expire(key, Duration.ofHours(1));
         }
 
-        return true; // 보안 통과
+        // 3. 만약 방금 올린 숫자가 제한선(LIMIT)을 넘어버렸다면?
+        if (currentCount > LIMIT) {
+            // 이번 요청은 차단할 것이므로, 방금 올렸던 카운트를 다시 빼서 원상복구(Rollback) 해줍니다.
+            redisTemplate.opsForValue().decrement(key);
+            return false; //  차단
+        }
+
+        // 4. 10회 이하라면 무사히 통과
+        return true; //  통과
+
     }
 
     /**
      * 캡차 인증에 성공했을 때, 해당 유저의 요청 횟수 기록을 지워줍니다.
      */
-    public void resetCount(String guestUuid) {
-        redisTemplate.delete("limit:" + guestUuid);
+    public void resetCount(String clinetIp) {
+        redisTemplate.delete("limit:" + clinetIp);
     }
     public boolean verifyWithGoogle(String captchaToken) {
         // 구글 API는 폼 데이터 형식을 원합니다.

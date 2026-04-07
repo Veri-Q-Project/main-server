@@ -7,10 +7,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import com.veriq.veriqgateway.dto.CaptchaRequest;
+import org.springframework.beans.factory.annotation.Value;
+
 import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1")
@@ -22,21 +25,38 @@ public class GatewayController {
     // 🔗 고근 님(BE 3) 서버의 실제 API 주소
     // 실전에서는 localhost 대신 도커 네트워크 서비스 명칭을 쓰기도 하지만,
     // 지금은 로컬 테스트용으로 작성했습니다.
-    private final String BE3_URL = "http://localhost:8083/api/v1/scan/upload";
-
+    //private final String BE3_URL = "http://localhost:8083/api/v1/scan/upload";
+    @Value("${be3.api.url}")
+    private String be3Url;
     /**
      * [POST] /api/v1/scan
      * 1. Redis(도커)를 통한 5회 제한 보안 검사
      * 2. 통과 시 BE 3 서버로 이미지 및 guestId 전송
      */
+    /**
+     * 클라이언트의 실제 IP를 추출하는 헬퍼 메서드 (도커/프록시 환경 대응)
+     */
+    private String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        // 여러 IP가 거쳐온 경우 첫 번째 IP가 실제 클라이언트 IP
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
+    }
     @PostMapping(value = "/scan", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ScanResponse> processScan(
             @RequestHeader("guest_uuid") String guestUuid,
-            @RequestParam("image") MultipartFile image) {
+            @RequestParam("image") MultipartFile image,
+            HttpServletRequest request) {
 
         // --- [STEP 1] 보안 검사 (Redis 연동) ---
-        // 도커로 띄운 Redis에 접속해 해당 guestId의 요청 횟수를 체크합니다.
-        if (!securityService.isAllowed(guestUuid)) {
+        // 도커로 띄운 클라이언트가 보낸 UUID가 아닌, 실제 IP를 식별자로 사용.
+        String clientIp = getClientIp(request);
+        if (!securityService.isAllowed(clientIp)) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS) // 429 에러
                     .body(ScanResponse.builder()
                             .guestUuid(guestUuid)
@@ -73,7 +93,7 @@ public class GatewayController {
             HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 
             // RestTemplate을 이용해 서버(BE 3) 호출
-            restTemplate.postForEntity(BE3_URL, requestEntity, String.class);
+            restTemplate.postForEntity(be3Url, requestEntity, String.class);
 
             // --- [STEP 3] 최종 성공 응답 ---
             return ResponseEntity.ok(ScanResponse.builder()
@@ -101,11 +121,14 @@ public class GatewayController {
      */
 
     @PostMapping("/auth/captcha/verify")
-    public ResponseEntity<ScanResponse> verifyCaptcha(@RequestBody CaptchaRequest request) {
+    public ResponseEntity<ScanResponse> verifyCaptcha(
+            @RequestBody CaptchaRequest captchaReq,
+            HttpServletRequest request) {
 
         // [STEP 1] 구글 실전 검증
-        String currentUuid = request.getGuestUuid();
-        boolean isHuman = securityService.verifyWithGoogle(request.getCaptchaToken());
+        String clientIp = getClientIp(request);
+        String currentUuid = captchaReq.getGuestUuid();
+        boolean isHuman = securityService.verifyWithGoogle(captchaReq.getCaptchaToken());
 
         if (!isHuman) {
             // 매크로인인 경우
@@ -118,7 +141,7 @@ public class GatewayController {
         }
 
         // [STEP 2] 검증 성공 시 Redis 카운트 초기화
-        securityService.resetCount(currentUuid);
+        securityService.resetCount(clientIp);
 
         // [STEP 3] 성공 응답 (프런트가 메시지를 받고 스캔을 재시도함)
         return ResponseEntity.ok(ScanResponse.builder()
