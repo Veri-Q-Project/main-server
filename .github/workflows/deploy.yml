@@ -22,4 +22,6 @@ jobs:
             git pull origin develop
             chmod +x gradlew
             sudo ./gradlew bootJar
+            echo "MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}" > .env
             sudo docker-compose up --build -d
+              

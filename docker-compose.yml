@@ -7,9 +7,9 @@ services:
     container_name: veriq-db
     restart: always
     ports:
-      - "3306:3306"
+      - "127.0.0.1:3306:3306"
     environment:
-      MYSQL_ROOT_PASSWORD: veriq123
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: veriq_db
     volumes:
       - ./mysql_data:/var/lib/mysql
@@ -20,42 +20,49 @@ services:
     container_name: veriq-redis
     restart: always
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
 
   # 3. Spring BE1 (Gateway - 박상민 )
   veriq-gateway:
-    image: eclipse-temurin:21-jdk
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: veriq-be1
     restart: always
     ports:
       - "8081:8081"
-    volumes:
-      - /home/sk38808738/main-server/build/libs:/home/sk38808738/main-server/build/libs
-    entrypoint: [ "java", "-jar", "-Dspring.profiles.active=be1", "/home/sk38808738/main-server/build/libs/app.jar" ]
+    environment:
+      SPRING_PROFILES_ACTIVE: be1
+      BE3_API_URL: "http://veriq-platform:8083/api/v1/scan/upload"
+
     depends_on:
       - veriq-db
       - veriq-redis
 
   # 4. Spring BE3 (Platform/Data Hub)
   veriq-platform:
-    image: eclipse-temurin:21-jdk
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: veriq-be3
     restart: always
     ports:
       - "8083:8083"
-    volumes:
-      - /home/sk38808738/main-server/build/libs:/home/sk38808738/main-server/build/libs
-    entrypoint: [ "java", "-jar", "-Dspring.profiles.active=be3", "/home/sk38808738/main-server/build/libs/app.jar" ]
+    environment:
+      SPRING_PROFILES_ACTIVE: be3
+
     depends_on:
       - veriq-db
       - veriq-redis
 
   # 5. FastAPI (분석 엔진)
   veriq-analysis:
-    image: python:3.9-slim
+    build:
+      context: ../analysis-engine
+      dockerfile: Dockerfile
     container_name: veriq-analysis
     restart: always
     ports:
-      - "8000:8000"
+        - "8000:8000"
     depends_on:
-      - veriq-db
+        - veriq-db

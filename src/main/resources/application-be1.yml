@@ -5,7 +5,7 @@ spring:
   datasource:
     url: jdbc:mysql://veriq-db:3306/veriq_db?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
     username: root
-    password: veriq123
+    password: ${MYSQL_ROOT_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
     # DB 연결을 최대 30초까지 기다려주는 인내심 설정
     hikari:
@@ -25,3 +25,8 @@ spring:
     redis:
       host: veriq-redis
       port: 6379
+
+
+  be3:
+    api:
+      url: "http://localhost:8083/api/v1/scan/upload"
