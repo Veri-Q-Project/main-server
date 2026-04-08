@@ -37,15 +37,8 @@ public class GatewayController {
      * 클라이언트의 실제 IP를 추출하는 헬퍼 메서드 (도커/프록시 환경 대응)
      */
     private String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getRemoteAddr();
-        }
-        // 여러 IP가 거쳐온 경우 첫 번째 IP가 실제 클라이언트 IP
-        if (ip != null && ip.contains(",")) {
-            ip = ip.split(",")[0].trim();
-        }
-        return ip;
+
+        return request.getRemoteAddr();
     }
     @PostMapping(value = "/scan", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ScanResponse> processScan(

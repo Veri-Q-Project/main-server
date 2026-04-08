@@ -8,6 +8,9 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import com.veriq.veriqgateway.dto.GoogleCaptchaResponse;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
+import java.util.Collections;
 @Service
 @RequiredArgsConstructor
 
@@ -33,27 +36,37 @@ public class SecurityService {
         String key = "limit:" + clinetIp;
         // 1. [원자적 연산] 읽기 + 비교하기 전에 무조건 1을 먼저 증가시킵니다.
         // Redis는 자체적으로 동시성을 제어하므로, 이 연산은 절대 꼬이지 않습니다.
-        Long currentCount = redisTemplate.opsForValue().increment(key);
+        // 2. Lua 스크립트 작성: INCR과 EXPIRE를 쪼개질 수 없는 하나의 덩어리로 묶음
+        String script =
+                "local current = redis.call('INCR', KEYS[1]) \n" +
+                        "if current == 1 then \n" +
+                        "    redis.call('EXPIRE', KEYS[1], ARGV[1]) \n" +
+                        "end \n" +
+                        "return current";
+
+        // 스크립트 객체 생성 (반환값은 Long 타입)
+        RedisScript<Long> redisScript = new DefaultRedisScript<>(script, Long.class);
+
+        // 2. 스크립트 실행 (키 1개 전달, 만료 시간은 3600초(1시간) 전달)
+        Long currentCount = redisTemplate.execute(
+                redisScript,
+                Collections.singletonList(key),
+                "3600"
+        );
 
         if (currentCount == null) {
-            return false; // Redis 에러 대비 안전 장치
+            return false; // Redis 통신 에러 대비
         }
 
-        // 2. 만약 방금 증가시킨 결과가 1이라면 (최초 요청이라면)
-        if (currentCount == 1L) {
-            // 1시간 뒤에 기록이 사라지도록 타이머(TTL)를 설정합니다.
-            redisTemplate.expire(key, Duration.ofHours(1));
-        }
-
-        // 3. 만약 방금 올린 숫자가 제한선(LIMIT)을 넘어버렸다면?
+        // 3. 만약 방금 올린 숫자가 제한선(LIMIT)을 넘어버렸다면? (기존 로직 유지)
         if (currentCount > LIMIT) {
-            // 이번 요청은 차단할 것이므로, 방금 올렸던 카운트를 다시 빼서 원상복구(Rollback) 해줍니다.
+            // 차단할 것이므로 원상복구(Rollback)
             redisTemplate.opsForValue().decrement(key);
-            return false; //  차단
+            return false; // 차단
         }
 
-        // 4. 10회 이하라면 무사히 통과
-        return true; //  통과
+        // 4. 제한선 이하라면 무사히 통과
+        return true;
 
     }
 
