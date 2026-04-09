@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import com.veriq.veriqgateway.dto.CaptchaRequest;
+import org.springframework.beans.factory.annotation.Value;
 import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1")
@@ -22,7 +23,8 @@ public class GatewayController {
     // 🔗 고근 님(BE 3) 서버의 실제 API 주소
     // 실전에서는 localhost 대신 도커 네트워크 서비스 명칭을 쓰기도 하지만,
     // 지금은 로컬 테스트용으로 작성했습니다.
-    private final String BE3_URL = "http://localhost:8083/api/v1/scan/upload";
+    @Value("${be3.api.url}")
+    private  String BE3_URL ;
 
     /**
      * [POST] /api/v1/scan

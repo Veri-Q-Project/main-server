@@ -2,6 +2,11 @@ server:
   port: 8083
 
 spring:
+  profiles:
+    active: dev # 현재 활성화할 프로필
+    include:
+      - be1   # application-be1.yml 을 읽어옴
+      - be3   # application-be3.yml 을 읽어옴
   datasource:
     url: jdbc:mysql://34.64.182.89/veriq_db?serverTimezone=Asia/Seoul
     username: root
