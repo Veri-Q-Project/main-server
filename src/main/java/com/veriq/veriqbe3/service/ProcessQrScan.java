@@ -18,7 +18,7 @@ public class ProcessQrScan {
     private final ScanHistoryRepository scanHistoryRepository;
 
     @Transactional // DB 저장 중 에러 발생 시 롤백하기 위함
-    public QrScanResponse process(MultipartFile image, String guest_uuid) throws Exception {
+    public QrScanResponse process(MultipartFile image, String guestUuid) throws Exception {
 
         String url = qrDecoder.decode(image);         //이미지 디코드
 
