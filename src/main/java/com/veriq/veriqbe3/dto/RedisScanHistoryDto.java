@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 public class RedisScanHistoryDto {
     private String schemeType;
     private String typeInfo;
-    private String status;
+    //private String status;
     private String scannedAt;    // 스캔시간
 
     // 편의 메서드: QrScanResponse 객체를 받아서 Redis용 객체로 쏙 변환해줍니다.
@@ -16,7 +16,7 @@ public class RedisScanHistoryDto {
         return RedisScanHistoryDto.builder()
                 .schemeType(response.getSchemeType().name())
                 .typeInfo(response.getTypeInfo())
-                .status(response.getStatus())
+                //.status(response.getStatus())
                 .scannedAt(LocalDateTime.now().toString()) // 현재 시간 자동 입력
                 .build();
     }
