@@ -4,9 +4,7 @@ server:
 spring:
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
-    include:
-      - be1   # application-be1.yml 을 읽어옴
-      - be3   # application-be3.yml 을 읽어옴
+
   datasource:
     url: jdbc:mysql://34.64.182.89/veriq_db?serverTimezone=Asia/Seoul
     username: root

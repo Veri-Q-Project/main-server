@@ -1,6 +1,7 @@
 package com.veriq.veriqgateway.controller;
 import com.veriq.veriqgateway.dto.ScanResponse;
 import com.veriq.veriqgateway.service.SecurityService;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
+@Profile("be1")
 public class GatewayController {
     private final SecurityService securityService;
     private final RestTemplate restTemplate;
