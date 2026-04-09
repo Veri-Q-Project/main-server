@@ -31,7 +31,7 @@ public class ProcessQrScan {
             ScanHistory history = ScanHistory.builder()     //entity 생성
                     .guestUuid(guest_uuid)
                     .originalUrl(url)
-                    .extractedData(result.typeInfo())
+                    .typeInfo(result.typeInfo())
                     .schemeType(result.type())
                     .analysisTime(response.analysisTime())
                     .totalScore(response.score())
