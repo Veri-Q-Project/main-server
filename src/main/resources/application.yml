@@ -3,7 +3,7 @@ server:
 
 spring:
   profiles:
-    active: dev # 현재 활성화할 프로필
+    active: ${SPRING_PROFILES_ACTIVE:dev}
     include:
       - be1   # application-be1.yml 을 읽어옴
       - be3   # application-be3.yml 을 읽어옴
