@@ -22,7 +22,7 @@ spring:
       hibernate:
         format_sql: true
         # MySQL 8.0 버전에 맞게 Dialect를 조금 더 구체적으로 지정
-        dialect: org.hibernate.dialect.MySQL8Dialect
+        dialect: org.hibernate.dialect.MySQLDialect
 
   data:
     redis:
