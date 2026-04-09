@@ -1,6 +1,7 @@
 package com.veriq.veriqbe3.service;
 
 import com.veriq.veriqbe3.domain.SchemeType;
+import com.veriq.veriqbe3.dto.AnalysisResponse;
 import com.veriq.veriqbe3.dto.QrScanResponse;
 import com.veriq.veriqbe3.entity.ScanHistory;
 import com.veriq.veriqbe3.repository.ScanHistoryRepository;
@@ -8,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -28,8 +31,24 @@ public class ProcessQrScan {
 
         if (result.type() == SchemeType.WEB || result.type() == SchemeType.SHORT_URL) {
 
-            ScanHistory history = ScanHistory.builder()     //entity 생성
-                    .guestUuid(guest_uuid)
+            // BE2 response 테스트값
+            AnalysisResponse response=new AnalysisResponse(
+            LocalDateTime.now(), // analysisTime
+            url,                 // originalUrl
+            new AnalysisResponse.HttpsInfo(true),
+            new AnalysisResponse.ShortUrlInfo(false),
+            new AnalysisResponse.MlInfo(java.util.List.of("safe"), 10),
+            new AnalysisResponse.ExternalApiInfo(true, "Google", "Clean"),
+            new AnalysisResponse.InternalDbInfo(false, 0, 0),
+            new AnalysisResponse.RedirectInfo(url, 0),
+            new AnalysisResponse.ServerInfo("Nginx", "KR",
+                    new AnalysisResponse.CertificateInfo(true, "DigiCert", LocalDateTime.now(), LocalDateTime.now().plusYears(1))),
+            95,      // score
+            "SAFE"   // riskLevel
+            );
+
+            ScanHistory scanHistory = ScanHistory.builder()
+                    .guestUuid(guestUuid)
                     .originalUrl(url)
                     .typeInfo(result.typeInfo())
                     .schemeType(result.type())
