@@ -24,17 +24,18 @@ public class ProcessQrScan {
 
         SchemeClassifier.ClassificationResult result = schemeClassifier.classify(url);    //scheme 분류
 
-        ScanHistory history = ScanHistory.builder()     //entity 생성
-                .guestUuid(guest_uuid)
-                .originalUrl(url)
-                .extractedData(result.typeInfo())
-                .schemeType(result.type())
-                .build();
-        scanHistoryRepository.save(history);            //repository에 저장
-
         String status = "COMPLETED";
 
         if (result.type() == SchemeType.WEB || result.type() == SchemeType.SHORT_URL) {
+
+            ScanHistory history = ScanHistory.builder()     //entity 생성
+                    .guestUuid(guest_uuid)
+                    .originalUrl(url)
+                    .extractedData(result.typeInfo())
+                    .schemeType(result.type())
+                    .build();
+            scanHistoryRepository.save(history);            //repository에 저장
+
             return QrScanResponse.builder()
                     .guestUuid(guest_uuid)
                     .schemeType(result.type())
