@@ -33,6 +33,7 @@ services:
       - "8081:8081"
     environment:
       SPRING_PROFILES_ACTIVE: be1
+      SERVER_PORT: 8081
       BE3_API_URL: "http://veriq-platform:8083/api/v1/scan/upload"
 
     depends_on:
