@@ -24,3 +24,4 @@ spring:
     redis:
       host: veriq-redis
       port: 6379
+
