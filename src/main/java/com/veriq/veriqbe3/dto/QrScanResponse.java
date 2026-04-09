@@ -8,7 +8,6 @@ import lombok.Getter;
 @Builder
 public class QrScanResponse {
     private String guestUuid;
-
     private SchemeType schemeType;
     private String typeInfo;
     private String status;

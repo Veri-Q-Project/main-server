@@ -25,7 +25,7 @@ public class ScanHistory {
     private SchemeType schemeType;
     private LocalDateTime scannedAt;
 
-    @PrePersist
+    @PrePersist //첫 insert직전 실행
     public void prePersist() {
         this.scannedAt = LocalDateTime.now();
     }
