@@ -27,6 +27,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - MAIN_CLASS=com.veriq.veriqgateway.VeriQGatewayApplication # 👈 Gateway 메인 지정
     container_name: veriq-be1
     restart: always
     ports:
@@ -45,12 +47,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - MAIN_CLASS=com.veriq.veriqbe3.VeriQBe3Application
     container_name: veriq-be3
     restart: always
     ports:
       - "8083:8083"
     environment:
       SPRING_PROFILES_ACTIVE: be3
+      SERVER_PORT: 8083
 
     depends_on:
       - veriq-db

@@ -45,3 +45,16 @@ tasks.named('test') {
 jar {
     enabled = false
 }
+
+// 외부에서 전달된 mainClass 파라미터가 있으면 그걸 사용하고, 없으면 기본값 사용
+def selectedMainClass = project.hasProperty('mainClass') ? project.getProperty('mainClass') : 'com.veriq.veriqgateway.VeriQGatewayApplication'
+
+// 2. Spring Boot가 실행 가능한 jar를 만들 때 이 클래스를 메인으로 사용하도록 설정
+bootJar {
+    mainClass = selectedMainClass
+}
+
+// 3. (중요) Gradle 자체의 메인 클래스 설정도 동기화해줍니다.
+springBoot {
+    mainClass = selectedMainClass
+}
