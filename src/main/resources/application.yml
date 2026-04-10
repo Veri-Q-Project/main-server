@@ -1,19 +1,40 @@
-server:
-  port: 8083
-
+# [공통 설정]
 spring:
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE:}
+    active: gateway
 
+---
+# [Gateway 설정 구역 - BE1]
+spring:
+  config:
+    activate:
+      on-profile: gateway
+
+server:
+  port: 8081
+
+be3:
+  api:
+    url: http://veriq-be3:8083
+
+google:
+  recaptcha:
+    secret-key: ${GOOGLE_RECAPTCHA_SECRET_KEY:6LcFLIssAAAAAPFDzhaixpw0fnxyQW-ieQS8O8TD}
+
+---
+# [BE3 설정 구역 - 나]
+spring:
+  config:
+    activate:
+      on-profile: be3
+  # 데이터베이스 및 JPA 설정을 하나의 spring: 블록 아래로 모았습니다.
   datasource:
-    url: jdbc:mysql://34.64.182.89/veriq_db?serverTimezone=Asia/Seoul
+    url: jdbc:mysql://veriq-db:3306/veriq_db?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
     username: root
-    password: veriq123
+    password: ${MYSQL_ROOT_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
-    # DB 연결을 최대 30초까지 기다려주는 인내심 설정
     hikari:
       connection-timeout: 30000
-
   jpa:
     hibernate:
       ddl-auto: update
@@ -21,10 +42,6 @@ spring:
     properties:
       hibernate:
         format_sql: true
-        # MySQL 8.0 버전에 맞게 Dialect를 조금 더 구체적으로 지정
-        dialect: org.hibernate.dialect.MySQLDialect
 
-  data:
-    redis:
-      host: veriq-redis
-      port: 6379
+server:
+  port: 8083

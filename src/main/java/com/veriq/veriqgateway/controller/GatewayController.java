@@ -13,7 +13,6 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import com.veriq.veriqgateway.dto.CaptchaRequest;
 import org.springframework.beans.factory.annotation.Value;
-import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
@@ -88,7 +87,6 @@ public class GatewayController {
 
         } catch (Exception e) {
             // 고근 님 서버가 꺼져 있거나 통신 에러가 났을 경우 처리
-            e.printStackTrace(); // 1. 에러의 원인(Stack Trace)을 콘솔에 강제로 출력합니다.
             System.out.println(">>> 에러 메세지: " + e.getMessage()); // 2. 에러 메세지 요약 출력
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ScanResponse.builder()
@@ -99,7 +97,7 @@ public class GatewayController {
         }
     }
 
-    /**
+    /**..
      * [POST] /api/v1/auth/captcha/verify
      * 캡차 성공 시 해당 사용자의 Redis 제한 카운트를 초기화합니다.
      */
