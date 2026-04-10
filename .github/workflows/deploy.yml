@@ -17,7 +17,7 @@ jobs:
           host: ${{ secrets.GCP_IP }}
           username: ${{ secrets.GCP_USER }}
           key: ${{ secrets.GCP_SSH_KEY }}
-          command_timeout: 30m
+          command_timeout: 50m
           script: |
             cd /opt/main-server
             git pull origin develop
