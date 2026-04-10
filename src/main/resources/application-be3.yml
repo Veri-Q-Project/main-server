@@ -10,6 +10,10 @@ spring:
     # DB 연결을 최대 30초까지 기다려주는 인내심 설정
     hikari:
       connection-timeout: 30000
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
 
   jpa:
     hibernate:
