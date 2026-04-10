@@ -77,7 +77,10 @@ public class GatewayController {
             HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 
             // RestTemplate을 이용해 서버(BE 3) 호출
+            System.out.println(">>> [BE1] BE3(" + BE3_URL + ")로 데이터 전송 시도 중...");
             restTemplate.postForEntity(BE3_URL, requestEntity, String.class);
+            System.out.println(">>> [BE1] BE3로부터 응답 무사히 도착!");
+
 
             // --- [STEP 3] 최종 성공 응답 ---
             return ResponseEntity.ok(ScanResponse.builder()
