@@ -22,19 +22,19 @@ spring:
     properties:
       hibernate:
         format_sql: true
-
-  google:
-    recaptcha:
-      # 환경변수로 받거나, 일단 에러 안 나게 더미값이라도 넣어줍니다.
-      secret-key: ${GOOGLE_RECAPTCHA_SECRET_KEY}
-      verify-url: https://www.google.com/recaptcha/api/siteverify
-
-
-
   data:
     redis:
       host: veriq-redis
       port: 6379
+
+google:
+  recaptcha:
+     secret-key: ${GOOGLE_RECAPTCHA_SECRET_KEY}
+     verify-url: https://www.google.com/recaptcha/api/siteverify
+
+
+
+
 
 be3:
   api:
