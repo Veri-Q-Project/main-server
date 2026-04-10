@@ -19,10 +19,11 @@ spring:
       hibernate:
         format_sql: true
 
-  oogle:
+  google:
     recaptcha:
       # 환경변수로 받거나, 일단 에러 안 나게 더미값이라도 넣어줍니다.
       secret-key: ${GOOGLE_RECAPTCHA_SECRET_KEY:6LcFLIssAAAAAPFDzhaixpw0fnxyQW-ieQS8O8TD}
+      verify-url: https://www.google.com/recaptcha/api/siteverify
 
 
 
