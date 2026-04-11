@@ -2,8 +2,11 @@ server:
   port: 8083
 
 spring:
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:}
+
   datasource:
-    url: jdbc:mysql://veriq-db:3306/veriq_db?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    url: jdbc:mysql://34.64.182.89/veriq_db?serverTimezone=Asia/Seoul
     username: root
     password: veriq123
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -19,7 +22,7 @@ spring:
       hibernate:
         format_sql: true
         # MySQL 8.0 버전에 맞게 Dialect를 조금 더 구체적으로 지정
-        dialect: org.hibernate.dialect.MySQL8Dialect
+        dialect: org.hibernate.dialect.MySQLDialect
 
   data:
     redis:

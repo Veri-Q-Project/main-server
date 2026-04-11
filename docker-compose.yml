@@ -27,12 +27,18 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - MAIN_CLASS=com.veriq.veriqgateway.VeriQGatewayApplication # 👈 Gateway 메인 지정
     container_name: veriq-be1
     restart: always
     ports:
       - "8081:8081"
     environment:
       SPRING_PROFILES_ACTIVE: be1
+      SERVER_PORT: 8081
+      GOOGLE_RECAPTCHA_SECRET_KEY: ${GOOGLE_RECAPTCHA_SECRET_KEY}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+
       BE3_API_URL: "http://veriq-platform:8083/api/v1/scan/upload"
 
     depends_on:
@@ -44,12 +50,16 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - MAIN_CLASS=com.veriq.veriqbe3.VeriQBe3Application
     container_name: veriq-be3
     restart: always
     ports:
       - "8083:8083"
     environment:
       SPRING_PROFILES_ACTIVE: be3
+      SERVER_PORT: 8083
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
 
     depends_on:
       - veriq-db

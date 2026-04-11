@@ -21,7 +21,7 @@ public class SecurityService {
     // 사용자(Guest)에게 허용할 최대 스캔 횟수
     private static final int LIMIT = 10;
     private final RestTemplate restTemplate; // 메인 클래스에서 등록한 빈 사용
-    @Value("${google.recaptcha.secret-key}")
+    @Value("${GOOGLE_RECAPTCHA_SECRET_KEY}")
     private String secretKey;
     @Value("${google.recaptcha.verify-url}")
     private String verifyUrl;
