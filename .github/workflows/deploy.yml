@@ -17,13 +17,12 @@ jobs:
           host: ${{ secrets.GCP_IP }}
           username: ${{ secrets.GCP_USER }}
           key: ${{ secrets.GCP_SSH_KEY }}
-          script:
-            git config --global --add safe.directory /opt/main-server
+          command_timeout: 50m
+          script: |
             cd /opt/main-server
             git pull origin develop
             chmod +x gradlew
             sudo ./gradlew bootJar
-            echo "MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}" > .env
             sudo docker-compose build --no-cache
             sudo docker-compose up --build -d
               
