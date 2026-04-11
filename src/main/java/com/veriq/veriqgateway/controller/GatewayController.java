@@ -39,6 +39,25 @@ public class GatewayController {
      */
     private String getClientIp(HttpServletRequest request) {
 
+        // 프록시 환경(Nginx, Docker Gateway 등)에서 진짜 IP를 담는 헤더들
+        String[] headerNames = {
+                "X-Forwarded-For",
+                "Proxy-Client-IP",
+                "WL-Proxy-Client-IP",
+                "HTTP_CLIENT_IP",
+                "HTTP_X_FORWARDED_FOR"
+        };
+
+        for (String header : headerNames) {
+            String ip = request.getHeader(header);
+            // IP가 유효하고 'unknown'이 아닐 때만 반환
+            if (ip != null && ip.length() != 0 && !"unknown".equalsIgnoreCase(ip)) {
+                // X-Forwarded-For: IP1, IP2, IP3 형태일 경우 첫 번째(원본) IP 추출
+                return ip.split(",")[0].trim();
+            }
+        }
+
+        // 헤더에 정보가 없으면 마지막 수단으로 직접 접속 IP 반환
         return request.getRemoteAddr();
     }
     @PostMapping(value = "/scan", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
