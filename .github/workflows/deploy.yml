@@ -1,0 +1,28 @@
+name: Veri-Q Develop Deploy
+
+on:
+  push:
+    branches: [ "develop", "feat/KD-12" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: SSH Remote Commands
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.GCP_IP }}
+          username: ${{ secrets.GCP_USER }}
+          key: ${{ secrets.GCP_SSH_KEY }}
+          command_timeout: 50m
+          script: |
+            cd /opt/main-server
+            git pull origin develop
+            chmod +x gradlew
+            sudo ./gradlew bootJar
+            sudo docker-compose build --no-cache
+            sudo docker-compose up --build -d
+              

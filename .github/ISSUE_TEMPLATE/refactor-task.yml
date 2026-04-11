@@ -1,0 +1,44 @@
+  name: "🧹 리팩토링 및 기술 부채"
+  description: "코드 구조 개선, 성능 최적화, 혹은 오래된 로직을 정리하는 작업을 기록합니다."
+  title: "[REFACTOR] "
+  labels: ["refactor", "tech-debt"]
+  body:
+    - type: input
+      id: target
+      attributes:
+        label: "대상 모듈/클래스"
+        placeholder: "예: com.veriq.veriqbe3.service.ProcessQrScan"
+      validations:
+        required: true
+    - type: dropdown
+      id: priority
+      attributes:
+        label: "우선순위"
+        options:
+          - Low
+          - Medium
+          - High
+          - Critical
+      validations:
+        required: true
+    - type: textarea
+      id: motivation
+      attributes:
+        label: "리팩토링 이유"
+        description: "왜 이 코드를 수정해야 하나요? (가독성, 성능, 테스트 용이성 등)"
+        placeholder: "예: 현재 WebClient 로직이 복잡하여 에러 처리를 분리할 필요가 있습니다."
+      validations:
+        required: true
+    - type: textarea
+      id: changes
+      attributes:
+        label: "상세 변경 내용"
+        description: "어떤 방식으로 코드를 변경할 계획인가요?"
+    - type: checkboxes
+      id: quality_check
+      attributes:
+        label: "품질 확인"
+        options:
+          - label: "기존 단위 테스트를 통과하는가?"
+          - label: "새로운 테스트 코드를 작성할 것인가?"
+          - label: "문서(README 등) 업데이트가 필요한가?"

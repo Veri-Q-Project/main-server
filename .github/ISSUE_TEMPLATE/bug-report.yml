@@ -1,0 +1,22 @@
+  name: "🛡️ VeriQ 스캔 오류 보고"
+  description: "QR 스캔이나 분석 과정에서의 문제를 알려주세요."
+  body:
+    - type: input
+      id: scheme
+      attributes:
+        label: "스캔한 스킴 종류"
+        placeholder: "예: WEB, SHORT_URL, TEL 등"
+      validations:
+        required: true
+    - type: dropdown
+      id: environment
+      attributes:
+        label: "실행 환경"
+        options:
+          - Local (localhost)
+          - Remote
+    - type: textarea
+      id: description
+      attributes:
+        label: "상세 설명"
+        description: "어떤 문제가 발생했나요?"
