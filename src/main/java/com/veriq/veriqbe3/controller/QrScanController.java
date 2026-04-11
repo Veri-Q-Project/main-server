@@ -26,7 +26,7 @@ public class QrScanController {
         @RequestHeader(value = "guest_uuid", required = false ) String guestUuid,
         @RequestParam("image") MultipartFile image) {
         try {
-            QrScanResponse response = processQrScan.process(image, guestUuid);
+            QrScanResponse response = qrScanRedisService.processWithRedis(image, guestUuid);
                return ResponseEntity.ok(response);
 
         } catch (Exception e) {
@@ -34,7 +34,7 @@ public class QrScanController {
             return ResponseEntity.badRequest().build();
         }
     }
-    //  스캔 내역 상세 조회 API 엔드포인트
+    //  스캔 내역 및 로딩화면 후 상세 보고서 API 엔드포인트
     @GetMapping("/detail")
     public ResponseEntity<?> getUrlDetail(@RequestParam("url") String url) {
         try {
@@ -57,6 +57,28 @@ public class QrScanController {
             log.error("상세 조회 중 서버 에러 발생 - URL: {}", url, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("서버 내부 오류가 발생했습니다.");
+        }
+    }
+
+    // ML 서버가 분석을 마치고 결과를 던져주는 콜백 API
+    @PostMapping("/callback")
+    public ResponseEntity<String> analysisCallback(
+            @RequestHeader(value = "guest_uuid", required = false) String guestUuid,
+            @RequestBody AnalysisResponse resultDto) {
+
+        try {
+            log.info("ML 서버로부터 분석 완료 콜백 수신 - URL: {}", resultDto.originalUrl());
+
+            // 1. 서비스 계층에 넘겨서 DB 저장 및 Redis 캐싱을 한 번에 처리!
+            qrScanRedisService.saveAndCacheAnalysisResult(resultDto, guestUuid);
+
+            // 2. 가흔 님 서버에게 "잘 받았어!" 라고 200 OK 응답
+            return ResponseEntity.ok("DB 저장 및 캐싱 완벽하게 완료!");
+
+        } catch (Exception e) {
+            log.error("콜백 데이터 처리 중 에러 발생", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("콜백 처리 실패: " + e.getMessage());
         }
     }
 }

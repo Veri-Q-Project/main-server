@@ -61,7 +61,7 @@ public class GatewayController {
         return request.getRemoteAddr();
     }
     @PostMapping(value = "/scan", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ScanResponse> processScan(
+    public ResponseEntity<?> processScan(
             @RequestHeader("guest_uuid") String guestUuid,
             @RequestParam("image") MultipartFile image,
             HttpServletRequest request) {
@@ -107,16 +107,14 @@ public class GatewayController {
 
             // RestTemplate을 이용해 서버(BE 3) 호출
             System.out.println(">>> [BE1] BE3(" + BE3_URL + ")로 데이터 전송 시도 중...");
-            restTemplate.postForEntity(BE3_URL, requestEntity, String.class);
+            // BE3가 반환하는 QrScanResponse(JSON)를 그대로 Object 형태로 받습니다.
+            ResponseEntity<Object> responseFromBe3 = restTemplate.postForEntity(BE3_URL, requestEntity, Object.class);
             System.out.println(">>> [BE1] BE3로부터 응답 무사히 도착!");
 
 
             // --- [STEP 3] 최종 성공 응답 ---
-            return ResponseEntity.ok(ScanResponse.builder()
-                    .guestUuid(guestUuid)
-                    .status("PENDING")
-                    .message("보안 검사 통과 및 분석 요청이 성공적으로 전달되었습니다.")
-                    .build());
+            return ResponseEntity.status(responseFromBe3.getStatusCode())
+                    .body(responseFromBe3.getBody());
 
         } catch (Exception e) {
             // 고근 님 서버가 꺼져 있거나 통신 에러가 났을 경우 처리

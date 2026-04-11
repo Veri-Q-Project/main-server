@@ -7,9 +7,10 @@ import java.time.LocalDateTime;
 
 public class RedisScanHistoryDto {
     private String schemeType;
-    private String typeInfo;
+    private String typeInfo;// 프론트에서 보여줄 원본 URL (예: https://www.naver.com)
     //private String status;
     private String scannedAt;    // 스캔시간
+    private String riskLevel;
 
     // 편의 메서드: QrScanResponse 객체를 받아서 Redis용 객체로 쏙 변환해줍니다.
     public static RedisScanHistoryDto from(QrScanResponse response) {
@@ -17,7 +18,8 @@ public class RedisScanHistoryDto {
                 .schemeType(response.getSchemeType().name())
                 .typeInfo(response.getTypeInfo())
                 //.status(response.getStatus())
-                .scannedAt(LocalDateTime.now().toString()) // 현재 시간 자동 입력
+                .scannedAt(LocalDateTime.now().toString())
+                .riskLevel(response.getStatus())
                 .build();
     }
 }
