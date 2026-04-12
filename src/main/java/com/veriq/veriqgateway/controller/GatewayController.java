@@ -116,15 +116,22 @@ public class GatewayController {
             return ResponseEntity.status(responseFromBe3.getStatusCode())
                     .body(responseFromBe3.getBody());
 
+        } catch (org.springframework.web.client.RestClientResponseException e) {
+            // ⭐ [추가] BE3가 던진 4xx, 5xx 에러를 그대로 받아서 프론트에 토스!
+            System.out.println(">>> [BE1] BE3로부터 에러 응답 수신: " + e.getStatusCode());
+
+            return ResponseEntity.status(e.getStatusCode()) // BE3가 준 400, 401 등을 그대로 사용
+                    .body(e.getResponseBodyAsString());        // BE3가 준 에러 메시지도 그대로 전달
+
         } catch (Exception e) {
-            // 고근 님 서버가 꺼져 있거나 통신 에러가 났을 경우 처리
-            e.printStackTrace(); // 1. 에러의 원인(Stack Trace)을 콘솔에 강제로 출력합니다.
-            System.out.println(">>> 에러 메세지: " + e.getMessage()); // 2. 에러 메세지 요약 출력
+            // 여기는 진짜 서버가 꺼졌거나 알 수 없는 심각한 오류일 때만 타게 됨
+            e.printStackTrace();
+            System.out.println(">>> 에러 메시지: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ScanResponse.builder()
                             .guestUuid(guestUuid)
                             .status("ERROR")
-                            .message("플랫폼 서버(BE 3)와의 연결에 실패했습니다: " + e.getMessage())
+                            .message("게이트웨이 통신 중 알 수 없는 오류 발생")
                             .build());
         }
     }

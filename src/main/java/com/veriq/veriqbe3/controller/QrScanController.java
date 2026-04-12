@@ -11,6 +11,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.beans.factory.annotation.Value;
 
 @Slf4j
 @RestController //json반환 컨트롤러
@@ -61,18 +63,29 @@ public class QrScanController {
     }
 
     // ML 서버가 분석을 마치고 결과를 던져주는 콜백 API
+    @Value("${ml.server.secret}")
+    private String mlServerSecret;
     @PostMapping("/callback")
     public ResponseEntity<String> analysisCallback(
             @RequestHeader(value = "guest_uuid", required = false) String guestUuid,
+            @RequestHeader(value = "X-ML-Secret", required = false) String providedSecret,
             @RequestBody AnalysisResponse resultDto) {
 
         try {
+            if (providedSecret == null || !providedSecret.equals(mlServerSecret)) {
+                log.warn("🚨 [보안 경고] 유효하지 않은 콜백 요청 접근 시도! URL: {}", resultDto.originalUrl());
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body("접근 권한이 없습니다 (Invalid Secret).");
+            }
             log.info("ML 서버로부터 분석 완료 콜백 수신 - URL: {}", resultDto.originalUrl());
 
             // 1. 서비스 계층에 넘겨서 DB 저장 및 Redis 캐싱을 한 번에 처리!
+            // 2. 비밀번호가 맞을 때만 DB 저장 및 캐싱을 진행
             qrScanRedisService.saveAndCacheAnalysisResult(resultDto, guestUuid);
 
-            // 2. 가흔 님 서버에게 "잘 받았어!" 라고 200 OK 응답
+
+
+            // 3. 가흔 님 서버에게 "잘 받았어!" 라고 200 OK 응답
             return ResponseEntity.ok("DB 저장 및 캐싱 완벽하게 완료!");
 
         } catch (Exception e) {
@@ -80,5 +93,15 @@ public class QrScanController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("콜백 처리 실패: " + e.getMessage());
         }
+    }
+
+    // 프론트엔드가 파이프를 꽂으러 오는 곳
+    @GetMapping(value = "/subscribe", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public ResponseEntity<SseEmitter> subscribe(@RequestParam("guest_uuid") String guestUuid) {
+
+        // 타임아웃 5분(300,000ms)짜리 파이프 생성
+        SseEmitter emitter = qrScanRedisService.createEmitter(guestUuid);
+
+        return ResponseEntity.ok(emitter);
     }
 }

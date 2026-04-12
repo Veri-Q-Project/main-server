@@ -7,7 +7,10 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "scan_history",indexes={@Index(name = "idx_final_url", columnList = "finalUrl")})
+@Table(name = "scan_history",indexes={
+        @Index(name = "idx_final_url", columnList = "finalUrl"),
+        @Index(name = "idx_original_url_scanned_at", columnList = "originalUrl, scannedAt DESC")
+})
 @Getter @Builder @NoArgsConstructor @AllArgsConstructor
 
 public class ScanHistory {

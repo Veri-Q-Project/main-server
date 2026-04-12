@@ -13,6 +13,10 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.util.DigestUtils;
 import org.springframework.transaction.annotation.Transactional;
 import com.veriq.veriqbe3.domain.SchemeType;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -26,8 +30,9 @@ public class QrScanRedisService {
     private final QrDecoder qrDecoder;
     private final SchemeClassifier schemeClassifier;
     private final StringRedisTemplate redisTemplate;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
     private final ScanHistoryRepository scanHistoryRepository;
+    private final Map<String, SseEmitter> emitters = new ConcurrentHashMap<>();
 
     // ⭐ 고근 님이 작업하실 클래스 (나중에 고근님이 구현하시면 주석 해제)
     // private final ProcessQrScan processQrScan;
@@ -119,7 +124,7 @@ public class QrScanRedisService {
         return dbResponse;
     }
     /**
-     * 고근 님의 콜백 API에서 분석이 끝난 후 호출할 메서드
+
      */
     public void cacheAnalysisResult(String url, AnalysisResponse resultDto) {
         try {
@@ -136,6 +141,10 @@ public class QrScanRedisService {
     }
 
     private void saveHistoryToRedis(String guestUuid, QrScanResponse response) {
+        // 방어 로직: UUID가 없거나 비어있거나 익명이면, 저장하지 않고 그냥 반환
+        if (guestUuid == null || guestUuid.isBlank() || guestUuid.equals("ANONYMOUS")) {
+            return;
+        }
         try {
             String historyKey = "history:" + guestUuid;
             RedisScanHistoryDto item = RedisScanHistoryDto.from(response);
@@ -154,19 +163,19 @@ public class QrScanRedisService {
      * URL 캐시 키를 안전하게 정규화하고 해싱하는 헬퍼 메서드
      */
     private String buildUrlCacheKey(String rawUrl) {
-        if (rawUrl == null) {
+        if (rawUrl == null || rawUrl.isBlank()) {
             return "url_cache:empty";
         }
 
-        // 1. 정규화: 앞뒤 공백 제거 및 소문자 변환
-        String cleanUrl = rawUrl.trim().toLowerCase();
+        // 1. 정규화: 앞뒤 공백 제거
+        String cleanUrl = rawUrl.trim();
 
-        // 2. 쿼리 파라미터(?) 제거 (순수 도메인/경로만 캐싱하여 적중률 향상)
-        int questionIndex = cleanUrl.indexOf('?');
-        if (questionIndex != -1) {
-            cleanUrl = cleanUrl.substring(0, questionIndex);
+        // 2. Fragment(#)만 제거하고, QueryString(?)은 반드시 보존!
+        // 브라우저 내부용인 # 뒤는 잘라도 되지만, ? 뒤는 데이터이므로 남깁니다.
+        int hashIndex = cleanUrl.indexOf('#');
+        if (hashIndex != -1) {
+            cleanUrl = cleanUrl.substring(0, hashIndex);
         }
-
         // 3. 해싱: MD5 알고리즘을 사용하여 어떤 길이의 URL이든 짧고 안전한 문자열로 변환
         String hashedUrl = DigestUtils.md5DigestAsHex(cleanUrl.getBytes());
 
@@ -225,9 +234,10 @@ public class QrScanRedisService {
             // 1. 프론트용 DTO를 DB 저장용 Entity로 변환
             // ==========================================
             String url = responseDto.originalUrl(); // 편의를 위해 변수 추출
+            String safeGuestUuid = (guestUuid != null && !guestUuid.isBlank()) ? guestUuid : "ANONYMOUS";
 
             ScanHistory scanHistory = ScanHistory.builder()
-                    .guestUuid(guestUuid)
+                    .guestUuid(safeGuestUuid)
                     .originalUrl(url)
                     .typeInfo(url) // 보통 원본 URL을 넣습니다
                     .schemeType(SchemeType.WEB) // 콜백으로 오는 건 사실상 모두 WEB이라고 가정
@@ -298,10 +308,37 @@ public class QrScanRedisService {
             // ==========================================
             cacheAnalysisResult(url, responseDto);
 
+            log.info("DB 저장 완료. 프론트엔드(guest_uuid: {})로 SSE 알림 발송 시도", guestUuid);
+            // 프론트엔드로 프로세스 완료 알림
+            SseEmitter emitter = emitters.get(guestUuid);
+            if (emitter != null) {
+                // "COMPLETE"라는 이름표를 붙여서 URL 데이터를 쏴줌
+                emitter.send(SseEmitter.event()
+                        .name("COMPLETE")
+                        .data(responseDto.originalUrl()));
+            }
+
         } catch (Exception e) {
             log.error("DB 저장 및 캐싱 중 에러 발생: {}", responseDto.originalUrl(), e);
             throw new RuntimeException("DB 저장 실패", e);
         }
+    }
+    // 1. 파이프(진동벨) 만들어주는 메서드
+    public SseEmitter createEmitter(String guestUuid) {
+        SseEmitter emitter = new SseEmitter(300000L); // 5분 타임아웃
+        emitters.put(guestUuid, emitter); // 명부에 등록
+
+        // 파이프 연결이 끊기면 명부에서 삭제
+        emitter.onCompletion(() -> emitters.remove(guestUuid));
+        emitter.onTimeout(() -> emitters.remove(guestUuid));
+
+        try {
+            // 연결되자마자 503 에러 방지용 더미(Dummy) 데이터 하나 전송
+            emitter.send(SseEmitter.event().name("INIT").data("Connected!"));
+        } catch (Exception e) {
+            emitters.remove(guestUuid);
+        }
+        return emitter;
     }
 
 

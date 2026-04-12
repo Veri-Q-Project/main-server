@@ -29,3 +29,7 @@ spring:
       host: veriq-redis
       port: 6379
 
+ml:
+  server:
+    # 도커가 넘겨준 ML_SECRET_KEY 환경변수를 읽어 (없으면 default_secret 사용)
+    secret: ${ML_SECRET_KEY:default_secret}
