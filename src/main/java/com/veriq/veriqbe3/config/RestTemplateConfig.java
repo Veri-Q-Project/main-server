@@ -1,8 +1,10 @@
-package com.veriq.veriqgateway.config;
+package com.veriq.veriqbe3.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
+import java.time.Duration;
+
 import java.time.Duration;
 
 @Configuration
@@ -19,5 +21,5 @@ public class RestTemplateConfig {
         // 3. 설정된 공장을 RestTemplate에 넣어서 완성
         return new RestTemplate(factory);
     }
-
 }
+

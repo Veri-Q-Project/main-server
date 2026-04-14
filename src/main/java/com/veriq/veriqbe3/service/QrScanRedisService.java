@@ -1,6 +1,7 @@
 package com.veriq.veriqbe3.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.veriq.veriqbe3.dto.AnalysisResponse;
+import com.veriq.veriqbe3.dto.ProgressRequest;
 import com.veriq.veriqbe3.dto.QrScanResponse;
 import com.veriq.veriqbe3.dto.RedisScanHistoryDto;
 import com.veriq.veriqbe3.entity.ScanHistory;
@@ -14,14 +15,15 @@ import org.springframework.util.DigestUtils;
 import org.springframework.transaction.annotation.Transactional;
 import com.veriq.veriqbe3.domain.SchemeType;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import java.util.Map;
+
+
+import java.io.IOException;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Optional;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -32,6 +34,7 @@ public class QrScanRedisService {
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
     private final ScanHistoryRepository scanHistoryRepository;
+    private final MlRequestService mlRequestService;
     private final Map<String, SseEmitter> emitters = new ConcurrentHashMap<>();
 
     // ⭐ 고근 님이 작업하실 클래스 (나중에 고근님이 구현하시면 주석 해제)
@@ -44,71 +47,119 @@ public class QrScanRedisService {
     public QrScanResponse processWithRedis(MultipartFile image, String guestUuid) throws Exception {
 
         String url = qrDecoder.decode(image);
+        // 2. 디코딩 성공 시, 프론트로 실시간 텍스트만 쏘기!
+        if (url != null && !url.isEmpty()) {
+            String decodingMsg;
+            //url이 비 url인지 그냥 url인지 구별하는 함수: schemeClassifier
+            SchemeClassifier.ClassificationResult result = schemeClassifier.classify(url);
+
+            if (result.toBe2()) {
+                // URL일 때 문구
+                decodingMsg = "QR 코드 디코딩이 완료되었습니다.";
+            } else {
+                // 비 URL일 때 문구
+                decodingMsg = "QR 코드 내용을 확인한 결과 URL 형식이 아니었습니다.";
+            }
+
+
+
+            this.sendSseEvent(guestUuid, decodingMsg);
+
+            log.info("[SSE] QR 디코딩 완료 알림 전송 - User: {}", guestUuid);
+        }
+
         SchemeClassifier.ClassificationResult result = schemeClassifier.classify(url);
 
         QrScanResponse response;
 
         if (!result.toBe2()) {
             // [비 URL]
+            try {
+                // 1. [UI 업데이트] 분석 완료 (준비 중) 쏘기 -> progress 채널
+                ProgressRequest prepProgress = new ProgressRequest(
+                        guestUuid,
+                        "분석 완료",
+                        "IN_PROGRESS",
+                        "분석 결과를 정리하고 결과 페이지로 이동할 준비를 하고 있습니다"
+                );
+                this.sendSseEvent(guestUuid, objectMapper.writeValueAsString(prepProgress));
+
+                // 비 URL은 너무 빨리 끝나버려서 UI가 바뀌는 걸 사용자가 볼 수 없으므로,
+                // 0.5초 정도 살짝 딜레이를 주면 UX가 훨씬 부드러워집니다.
+                Thread.sleep(500);
+
+                // 2. [UI 업데이트] 분석 완료 (완료됨) 쏘기 -> progress 채널
+                ProgressRequest doneProgress = new ProgressRequest(
+                        guestUuid,
+                        "분석 완료",
+                        "COMPLETED",
+                        "분석이 완료되었습니다. 결과 페이지로 이동합니다."
+                );
+                this.sendSseEvent(guestUuid, objectMapper.writeValueAsString(doneProgress));
+
+                // 3. [데이터 전달] 실제 비 URL 데이터 포장
+                Map<String, Object> nonUrlData = new HashMap<>();
+                nonUrlData.put("isUrl", false);
+                nonUrlData.put("schemeType", result.type().name());
+                nonUrlData.put("typeInfo", result.typeInfo());
+
+                String jsonPayload = objectMapper.writeValueAsString(nonUrlData);
+
+                // 4. [종료 신호] 데이터 통째로 전송 후 파이프 닫기 -> COMPLETE 채널
+                this.sendSseCompleteEvent(guestUuid, jsonPayload);
+
+            } catch (Exception e) {
+                log.error("비 URL 처리 중 에러 발생", e);
+            }
+
+
             response = QrScanResponse.builder()
                     .guestUuid(guestUuid).schemeType(result.type()).typeInfo(result.typeInfo())
                     .status("COMPLETED").build();
-        } else {
-            // [URL] Redis 캐시 확인
-            String urlKey =  buildUrlCacheKey(result.typeInfo());
-            String cachedJson = redisTemplate.opsForValue().get(urlKey);
 
-            if (cachedJson != null) {
+        }else {
 
-                AnalysisResponse cacheDto = objectMapper.readValue(cachedJson, AnalysisResponse.class);
-                //RedisUrlCacheDto cacheDto = objectMapper.readValue(cachedJson, RedisUrlCacheDto.class);
-                // redis 캐시 존재
-                response = QrScanResponse.builder()
-                        .guestUuid(guestUuid).schemeType(result.type()).typeInfo(result.typeInfo())
-                        .status(cacheDto.riskLevel())
-                        .build();
-            } else {
 
-                Optional<ScanHistory> dbHistory = scanHistoryRepository.findFirstByOriginalUrlOrderByScannedAtDesc(result.typeInfo());
-                if (dbHistory.isPresent()) {
-                    // DB에 존재 -> 엔티티를 DTO로 변환
-                    AnalysisResponse dbResponse = convertToAnalysisResponse(dbHistory.get());
 
-                    //  꺼내온 데이터를 다음 요청을 위해 Redis에 캐싱 (Look-Aside)
-                    redisTemplate.opsForValue().set(urlKey, objectMapper.writeValueAsString(dbResponse), URL_CACHE_TTL);
+            response = QrScanResponse.builder()
+                    .guestUuid(guestUuid).schemeType(result.type()).typeInfo(result.typeInfo())
+                    .status("PROCESSING") // 프론트에게 "이제 로딩바 띄우고 기다려" 라고 알림
+                    .build();
 
-                    response = QrScanResponse.builder()
-                            .guestUuid(guestUuid).schemeType(result.type()).typeInfo(result.typeInfo())
-                            .status(dbResponse.riskLevel())
-                            .build();
-                }
-                else {
-                    // 3. DB에도 없음 -> 콜백api호출(분석서버에 요청)
-                    // processQrScan.requestAnalysisAsync(result.typeInfo(), guestUuid);
+            // 파이썬 서버로 던지는 로직
 
-                    response = QrScanResponse.builder()
-                            .guestUuid(guestUuid).schemeType(result.type()).typeInfo(result.typeInfo())
-                            .status("PROCESSING").build();
-                }
-
+            try {
+                mlRequestService.sendToPythonServer(guestUuid, result.typeInfo());
+                log.info("파이썬 서버로 분석 요청 완료 - User: {}, URL: {}", guestUuid, result.typeInfo());
+            } catch (Exception e) {
+                log.error("파이썬 서버 요청 중 에러 발생", e);
             }
+
+
         }
 
-        // Redis 스캔 히스토리 저장
-        saveHistoryToRedis(guestUuid, response);
 
         return response;
+
     }
     // 스캔 내역 URL 클릭 시 상세 보고서 내려주는 API
     public AnalysisResponse getUrlDetail(String url) throws Exception {
         String cacheKey = buildUrlCacheKey(url);
         String jsonCache = redisTemplate.opsForValue().get(cacheKey);
+        //상세보고서 요청시  redis에서 분석 결과 꺼내오는 과정
+        //캐시값이 꺠졌을떄 대비해서 try catch문 추가
 
         if (jsonCache != null) {
-            log.info("Redis에서 상세 분석 결과 반환: {}", url);
-            return objectMapper.readValue(jsonCache, AnalysisResponse.class);
+            try {
+                log.info("Redis 캐시 적중! 상세 분석 결과 반환: {}", url);
+                return objectMapper.readValue(jsonCache, AnalysisResponse.class);
+            } catch (Exception e) {
+                // 캐시 데이터가 깨졌을 경우 처리
+                log.error("Redis 캐시 파싱 실패 (손상된 데이터). 캐시 삭제 후 DB 조회를 시도합니다. URL: {}", url, e);
+                redisTemplate.delete(cacheKey); // 깨진 데이터 삭제
+                // 여기서 return하지 않고 그대로 두면 아래의 DB 조회 로직으로 자연스럽게 넘어감
+            }
         }
-
         //  Redis에 없으면 DB에서 조회
         Optional<ScanHistory> dbHistory = scanHistoryRepository.findFirstByOriginalUrlOrderByScannedAtDesc(url);
         if (dbHistory.isEmpty()) {
@@ -140,16 +191,17 @@ public class QrScanRedisService {
         }
     }
 
-    private void saveHistoryToRedis(String guestUuid, QrScanResponse response) {
+    public void saveHistoryToRedis(String guestUuid, AnalysisResponse mlResponse) {
         // 방어 로직: UUID가 없거나 비어있거나 익명이면, 저장하지 않고 그냥 반환
         if (guestUuid == null || guestUuid.isBlank() || guestUuid.equals("ANONYMOUS")) {
             return;
         }
         try {
             String historyKey = "history:" + guestUuid;
-            RedisScanHistoryDto item = RedisScanHistoryDto.from(response);
+            //  QR 원본 정보와 ML 분석 결과를 합쳐서 히스토리 DTO 생성!
+            RedisScanHistoryDto item = RedisScanHistoryDto.from(mlResponse);
             String jsonItem = objectMapper.writeValueAsString(item);
-
+            // Redis 리스트의 맨 앞(최신)에 밀어 넣기
             redisTemplate.opsForList().leftPush(historyKey, jsonItem);
             // 항상 50개만 남기고 옛날 데이터는 잘라버림
             redisTemplate.opsForList().trim(historyKey, 0, MAX_HISTORY_SIZE - 1);
@@ -226,7 +278,9 @@ public class QrScanRedisService {
         );
     }
 
-    @Transactional // DB 저장하다 에러 나면 롤백!,분석서버에서 온 결과 db 및 redis에 저장
+    @Transactional
+    // DB 저장하다 에러 나면 롤백!,
+    // 분석서버에서 온 결과 db 및 redis에 저장
     public void saveAndCacheAnalysisResult(AnalysisResponse responseDto, String guestUuid) {
 
         try {
@@ -308,15 +362,9 @@ public class QrScanRedisService {
             // ==========================================
             cacheAnalysisResult(url, responseDto);
 
-            log.info("DB 저장 완료. 프론트엔드(guest_uuid: {})로 SSE 알림 발송 시도", guestUuid);
+            log.info("DB 저장 완료");
             // 프론트엔드로 프로세스 완료 알림
-            SseEmitter emitter = emitters.get(guestUuid);
-            if (emitter != null) {
-                // "COMPLETE"라는 이름표를 붙여서 URL 데이터를 쏴줌
-                emitter.send(SseEmitter.event()
-                        .name("COMPLETE")
-                        .data(responseDto.originalUrl()));
-            }
+
 
         } catch (Exception e) {
             log.error("DB 저장 및 캐싱 중 에러 발생: {}", responseDto.originalUrl(), e);
@@ -327,18 +375,97 @@ public class QrScanRedisService {
     public SseEmitter createEmitter(String guestUuid) {
         SseEmitter emitter = new SseEmitter(300000L); // 5분 타임아웃
         emitters.put(guestUuid, emitter); // 명부에 등록
+        //3. 연결되자마자 프론트엔드에게 환영 인사(Init) 보내기!
+        try {
+            emitter.send(SseEmitter.event()
+                    .name("INIT") // 채널 이름을 INIT으로 설정
+                    .data("SSE 파이프라인 연결 성공! 분석 대기 중..."));
+
+            log.info(" [SSE] 유저와 파이프라인 연결 성공: guestUuid = {}", guestUuid);
+        } catch (IOException e) {
+            emitters.remove(guestUuid);
+            log.error(" SSE 초기 메시지 전송 실패", e);
+        }
 
         // 파이프 연결이 끊기면 명부에서 삭제
         emitter.onCompletion(() -> emitters.remove(guestUuid));
         emitter.onTimeout(() -> emitters.remove(guestUuid));
 
-        try {
-            // 연결되자마자 503 에러 방지용 더미(Dummy) 데이터 하나 전송
-            emitter.send(SseEmitter.event().name("INIT").data("Connected!"));
-        } catch (Exception e) {
-            emitters.remove(guestUuid);
-        }
+
         return emitter;
+    }
+    /**
+     * 특정 guestUuid를 가진 프론트엔드 파이프로 메시지를 전송합니다.
+     */
+    public void sendSseEvent(String guestUuid, String message) {
+        // 1. Map에 저장해둔 해당 유저의 파이프(SseEmitter)를 꺼냅니다.
+
+        SseEmitter emitter = emitters.get(guestUuid);
+
+        if (emitter != null) {
+            try {
+                // 2. 파이프가 존재하면 프론트로 메시지를 전송
+                emitter.send(SseEmitter.event()
+                        .name("progress") // 프론트엔드에서 이 이름으로 이벤트를 수신할 수 있습니다.
+                        .data(message));  // 실제 전송할 텍스트 ("도메인 사칭 분석 완료" 등)
+
+            } catch (Exception e) {
+                // 3. 만약 쏘는 중에 에러가 났다? (프론트가 새로고침해서 파이프가 끊긴 경우 등)
+                // 그러면 죽은 파이프는 미련 없이 버립니다.
+                emitters.remove(guestUuid);
+                log.error(" SSE 파이프 전송 실패 및 삭제: guestUuid = {}", guestUuid, e);
+            }
+        } else {
+            // 파이프가 아예 없는 경우 (이미 만료되었거나 연결된 적 없는 경우)
+            log.warn("⚠전송할 SSE 파이프를 찾을 수 없습니다: guestUuid = {}", guestUuid);
+        }
+    }
+    // 🏁 최종완료용 (채널 이름: COMPLETE)
+    public void sendSseCompleteEvent(String guestUuid, String url) {
+        SseEmitter emitter = emitters.get(guestUuid);
+        if (emitter != null) {
+            try {
+                emitter.send(SseEmitter.event()
+                        .name("COMPLETE")
+                        .data(url));
+
+                // 완료 신호를 보낸 후에는 파이프를 깔끔하게 닫아주는 게 좋습니다.
+                emitter.complete();
+                emitters.remove(guestUuid);
+            } catch (Exception e) {
+                emitters.remove(guestUuid);
+            }
+        }
+
+    }
+    // 저장된 히스토리 목록 가져오기
+    public List<Object> getHistoryFromRedis(String guestUuid) {
+        String historyKey = "history:" + guestUuid;
+        try {
+            // 0부터 -1은 리스트의 '처음부터 끝까지'를 의미합니다.
+            List<String> jsonHistoryList = redisTemplate.opsForList().range(historyKey, 0, -1);
+
+            if (jsonHistoryList == null || jsonHistoryList.isEmpty()) {
+                return List.of();
+            }
+
+            // Redis에 저장된 String(JSON)을 다시 Object(Map)로 변환해서 리턴해야
+            // 프론트엔드에서 깔끔한 JSON 배열로 받을 수 있습니다.
+            return jsonHistoryList.stream()
+                    .map(json -> {
+                        try {
+                            return objectMapper.readValue(json, Object.class);
+                        } catch (Exception e) {
+                            return null;
+                        }
+                    })
+                    .filter(Objects::nonNull)
+                    .toList();
+
+        } catch (Exception e) {
+            log.error("Redis 히스토리 조회 실패 - guestUuid: {}", guestUuid, e);
+            return List.of();
+        }
     }
 
 

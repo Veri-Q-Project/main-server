@@ -1,4 +1,5 @@
 package com.veriq.veriqgateway.controller;
+import com.veriq.veriqbe3.dto.QrScanResponse;
 import com.veriq.veriqgateway.dto.ScanResponse;
 import com.veriq.veriqgateway.service.SecurityService;
 import org.springframework.context.annotation.Profile;
@@ -107,17 +108,28 @@ public class GatewayController {
 
             // RestTemplate을 이용해 서버(BE 3) 호출
             System.out.println(">>> [BE1] BE3(" + BE3_URL + ")로 데이터 전송 시도 중...");
-            // BE3가 반환하는 QrScanResponse(JSON)를 그대로 Object 형태로 받습니다.
-            ResponseEntity<Object> responseFromBe3 = restTemplate.postForEntity(BE3_URL, requestEntity, Object.class);
+
+            ResponseEntity<QrScanResponse> responseFromBe3 = restTemplate.postForEntity(BE3_URL, requestEntity, QrScanResponse.class);
             System.out.println(">>> [BE1] BE3로부터 응답 무사히 도착!");
 
 
             // --- [STEP 3] 최종 성공 응답 ---
-            return ResponseEntity.status(responseFromBe3.getStatusCode())
-                    .body(responseFromBe3.getBody());
+            QrScanResponse be3Data = responseFromBe3.getBody();
+            if (be3Data == null) {
+                throw new RuntimeException("BE3 서버로부터 빈 응답(null)이 도착했습니다.");
+            }
+
+            ScanResponse finalResponse = ScanResponse.builder()
+                    .guestUuid(be3Data.getGuestUuid())
+                    .status(be3Data.getStatus())
+                    // BE3의 핵심 데이터(URL 등)를 프론트가 읽기 편하게 message에 담아줍니다.
+                    .message("스캔 완료. 타입: " + be3Data.getSchemeType() + ", 정보: " + be3Data.getTypeInfo())
+                    .build();
+
+            return ResponseEntity.status(responseFromBe3.getStatusCode()).body(finalResponse);
 
         } catch (org.springframework.web.client.RestClientResponseException e) {
-            // ⭐ [추가] BE3가 던진 4xx, 5xx 에러를 그대로 받아서 프론트에 토스!
+            //  BE3가 던진 4xx, 5xx 에러를 그대로 받아서 프론트에 토스!
             System.out.println(">>> [BE1] BE3로부터 에러 응답 수신: " + e.getStatusCode());
 
             return ResponseEntity.status(e.getStatusCode()) // BE3가 준 400, 401 등을 그대로 사용

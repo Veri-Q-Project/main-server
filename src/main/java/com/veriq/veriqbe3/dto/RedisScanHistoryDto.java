@@ -5,6 +5,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
 @Getter
 @Builder
 @NoArgsConstructor
@@ -16,15 +18,16 @@ public class RedisScanHistoryDto {
     //private String status;
     private String scannedAt;    // 스캔시간
     private String riskLevel;
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     // 편의 메서드: QrScanResponse 객체를 받아서 Redis용 객체로 쏙 변환해줍니다.
-    public static RedisScanHistoryDto from(QrScanResponse response) {
+    public static RedisScanHistoryDto from(AnalysisResponse mlResponse) {
         return RedisScanHistoryDto.builder()
-                .schemeType(response.getSchemeType().name())
-                .typeInfo(response.getTypeInfo())
+                .schemeType("URL") // 분석서버에서 callback해서 온것이므로 무조건 url
+                .typeInfo(mlResponse.originalUrl())
                 //.status(response.getStatus())
-                .scannedAt(LocalDateTime.now().toString())
-                .riskLevel(response.getStatus())
+                .scannedAt(LocalDateTime.now().format(FORMATTER))
+                .riskLevel(mlResponse.riskLevel())
                 .build();
     }
 }
