@@ -10,4 +10,7 @@ public class ScanResponse {
     private String status;      // PENDING 등
     private String error_code;  // REQUIRE_CAPTCHA
     private String message;
+    private boolean isUrl;
+    private String schemeType;
+    private String typeInfo;
 }

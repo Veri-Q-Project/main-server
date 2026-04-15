@@ -122,8 +122,10 @@ public class GatewayController {
             ScanResponse finalResponse = ScanResponse.builder()
                     .guestUuid(be3Data.getGuestUuid())
                     .status(be3Data.getStatus())
-                    // BE3의 핵심 데이터(URL 등)를 프론트가 읽기 편하게 message에 담아줍니다.
-                    .message("스캔 완료. 타입: " + be3Data.getSchemeType() + ", 정보: " + be3Data.getTypeInfo())
+                    .message(be3Data.getMessage())
+                    .isUrl(be3Data.isUrl())
+                    .schemeType(be3Data.getSchemeType() != null ? be3Data.getSchemeType().name() : null)
+                    .typeInfo(be3Data.getTypeInfo())
                     .build();
 
             return ResponseEntity.status(responseFromBe3.getStatusCode()).body(finalResponse);

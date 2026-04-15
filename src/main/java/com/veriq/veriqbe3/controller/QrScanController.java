@@ -43,13 +43,28 @@ public class QrScanController {
         @RequestParam("image") MultipartFile image) {
         try {
             QrScanResponse response = qrScanRedisService.processWithRedis(image, guestUuid);
-               return ResponseEntity.ok(response);
+            return ResponseEntity.ok(response);
 
-        } catch (Exception e) {
 
-            log.error("QR 스캔 요청 처리 중 에러 발생", e);
+            //  프런트가 이상한 데이터를 보냈을 때 (사용자 잘못 -> 400)
+        } catch (IllegalArgumentException e) {
+            log.warn("잘못된 QR 업로드 요청 - guestUuid: {}", guestUuid, e);
             return ResponseEntity.badRequest().build();
+
+//  파이썬 서버가 죽었거나, DB가 터졌을 때 (분석 서버 잘못 -> 502)
+        } catch (org.springframework.web.client.RestClientException e) {
+            log.error("QR 스캔 요청 처리 중 서버(다운스트림) 에러 발생 - guestUuid: {}", guestUuid, e);
+            // 파이썬 서버 통신 실패 시 (502 반환)
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
         }
+        /// 스프링 서버 내부에서 뭔가 터졌을 때 (스프링 서버잘못 -> 500)
+        catch (Exception e) {
+            log.error("QR 스캔 요청 처리 중 서버 내부 에러 발생 - guestUuid: {}", guestUuid, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+
+
+
     }
     //  스캔 내역 및 로딩화면 후 상세 보고서 API 엔드포인트 ,프런트랑 연결
     @GetMapping("/detail")

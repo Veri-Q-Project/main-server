@@ -86,8 +86,8 @@ public class QrScanRedisService {
                     .guestUuid(guestUuid)
                     .typeInfo(result.typeInfo())
                     .status("COMPLETED")
-                    .isUrl(true)           // 🌟 가흔 님이 쓸 변수 1 (URL 로딩창 띄우기용)
-                    .message(decodingMsg)  // 🌟 가흔 님이 쓸 변수 2
+                    .isUrl(true)           //
+                    .message(decodingMsg)  //
                     .build();
         }
 
@@ -402,6 +402,8 @@ public class QrScanRedisService {
                 emitter.complete();
                 emitters.remove(guestUuid);
             } catch (Exception e) {
+                //  추가: 누가 끊겼는지, 왜 끊겼는지 경고 로그를 남겨줍니다.
+                log.warn("SSE COMPLETE 이벤트 전송 실패 - guestUuid: {}", guestUuid, e);
                 emitters.remove(guestUuid);
             }
         }
