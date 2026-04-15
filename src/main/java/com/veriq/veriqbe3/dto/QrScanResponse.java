@@ -11,4 +11,6 @@ public class QrScanResponse {
     private SchemeType schemeType;
     private String typeInfo;
     private String status;
+    private boolean isUrl;
+    private String message;
 }

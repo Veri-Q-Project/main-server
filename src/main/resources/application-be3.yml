@@ -34,7 +34,7 @@ ml:
     # 도커가 넘겨준 ML_SECRET_KEY 환경변수를 읽음
     secret: ${ML_SECRET_KEY}
   api :
-    url: "http://veriq-analysis:8000/api/v1/scan/upload"#재조정
+    url: "http://veriq-analysis:8000/api/v1/scan/upload" #재조정
 
 
 # 프론트엔드 허용 주소 (도커 환경변수로 덮어쓰기 가능)

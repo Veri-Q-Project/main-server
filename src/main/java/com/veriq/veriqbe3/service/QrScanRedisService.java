@@ -37,8 +37,8 @@ public class QrScanRedisService {
     private final MlRequestService mlRequestService;
     private final Map<String, SseEmitter> emitters = new ConcurrentHashMap<>();
 
-    // ⭐ 고근 님이 작업하실 클래스 (나중에 고근님이 구현하시면 주석 해제)
-    // private final ProcessQrScan processQrScan;
+
+
 
     private static final int MAX_HISTORY_SIZE = 50;
     private static final Duration HISTORY_TTL = Duration.ofDays(7);
@@ -48,98 +48,66 @@ public class QrScanRedisService {
 
         String url = qrDecoder.decode(image);
         // 2. 디코딩 성공 시, 프론트로 실시간 텍스트만 쏘기!
-        if (url != null && !url.isEmpty()) {
-            String decodingMsg;
-            //url이 비 url인지 그냥 url인지 구별하는 함수: schemeClassifier
-            SchemeClassifier.ClassificationResult result = schemeClassifier.classify(url);
-
-            if (result.toBe2()) {
-                // URL일 때 문구
-                decodingMsg = "QR 코드 디코딩이 완료되었습니다.";
-            } else {
-                // 비 URL일 때 문구
-                decodingMsg = "QR 코드 내용을 확인한 결과 URL 형식이 아니었습니다.";
-            }
-
-
-
-            this.sendSseEvent(guestUuid, decodingMsg);
-
-            log.info("[SSE] QR 디코딩 완료 알림 전송 - User: {}", guestUuid);
+        //  [방어 로직] 디코딩 실패 시 (QR이 아니거나 깨진 이미지) 즉시 에러 던지기
+        if (url == null || url.isEmpty()) {
+            throw new IllegalArgumentException("QR 코드 디코딩에 실패했습니다.");
         }
 
+        // 2. URL 분류
         SchemeClassifier.ClassificationResult result = schemeClassifier.classify(url);
 
-        QrScanResponse response;
-
-        if (!result.toBe2()) {
-            // [비 URL]
-            try {
-                // 1. [UI 업데이트] 분석 완료 (준비 중) 쏘기 -> progress 채널
-                ProgressRequest prepProgress = new ProgressRequest(
-                        guestUuid,
-                        "분석 완료",
-                        "IN_PROGRESS",
-                        "분석 결과를 정리하고 결과 페이지로 이동할 준비를 하고 있습니다"
-                );
-                this.sendSseEvent(guestUuid, objectMapper.writeValueAsString(prepProgress));
-
-                // 비 URL은 너무 빨리 끝나버려서 UI가 바뀌는 걸 사용자가 볼 수 없으므로,
-                // 0.5초 정도 살짝 딜레이를 주면 UX가 훨씬 부드러워집니다.
-                Thread.sleep(500);
-
-                // 2. [UI 업데이트] 분석 완료 (완료됨) 쏘기 -> progress 채널
-                ProgressRequest doneProgress = new ProgressRequest(
-                        guestUuid,
-                        "분석 완료",
-                        "COMPLETED",
-                        "분석이 완료되었습니다. 결과 페이지로 이동합니다."
-                );
-                this.sendSseEvent(guestUuid, objectMapper.writeValueAsString(doneProgress));
-
-                // 3. [데이터 전달] 실제 비 URL 데이터 포장
-                Map<String, Object> nonUrlData = new HashMap<>();
-                nonUrlData.put("isUrl", false);
-                nonUrlData.put("schemeType", result.type().name());
-                nonUrlData.put("typeInfo", result.typeInfo());
-
-                String jsonPayload = objectMapper.writeValueAsString(nonUrlData);
-
-                // 4. [종료 신호] 데이터 통째로 전송 후 파이프 닫기 -> COMPLETE 채널
-                this.sendSseCompleteEvent(guestUuid, jsonPayload);
-
-            } catch (Exception e) {
-                log.error("비 URL 처리 중 에러 발생", e);
-            }
+        // 3. 프론트로 실시간 텍스트 쏘기 (삼항 연산자로 깔끔하게 정리)
+        // 1. URL 여부와 메시지를 명확한 변수로 빼둡니다.
+        boolean isUrl = result.toBe2();
+        String decodingMsg = isUrl
+                ? "QR 코드 디코딩이 완료되었습니다."
+                : "QR 코드 내용을 확인한 결과 URL 형식이 아니었습니다.";
 
 
-            response = QrScanResponse.builder()
-                    .guestUuid(guestUuid).schemeType(result.type()).typeInfo(result.typeInfo())
-                    .status("COMPLETED").build();
+        log.info("[Decode] {}", decodingMsg);
 
-        }else {
-
-
-
-            response = QrScanResponse.builder()
-                    .guestUuid(guestUuid).schemeType(result.type()).typeInfo(result.typeInfo())
-                    .status("PROCESSING") // 프론트에게 "이제 로딩바 띄우고 기다려" 라고 알림
+// 2. [비 URL] 처리 로직
+        if (!isUrl) {
+            return QrScanResponse.builder()
+                    .guestUuid(guestUuid)
+                    .typeInfo(result.typeInfo())
+                    .status("COMPLETED")
+                    .isUrl(false)
+                    .message(decodingMsg)
                     .build();
+        }
 
-            // 파이썬 서버로 던지는 로직
+// 3. [URL] 처리 로직
+// 3-1. 캐시(Redis) 확인 로직 (Fast-Path)
+        AnalysisResponse cachedResult = getUrlDetail(result.typeInfo());
+        if (cachedResult != null) {
+            log.info("[Fast-Path] 캐시랑 db에 존재 - URL: {}", result.typeInfo());
+            return QrScanResponse.builder()
+                    .guestUuid(guestUuid)
+                    .typeInfo(result.typeInfo())
+                    .status("COMPLETED")
+                    .isUrl(true)           // 🌟 가흔 님이 쓸 변수 1 (URL 로딩창 띄우기용)
+                    .message(decodingMsg)  // 🌟 가흔 님이 쓸 변수 2
+                    .build();
+        }
 
-            try {
-                mlRequestService.sendToPythonServer(guestUuid, result.typeInfo());
-                log.info("파이썬 서버로 분석 요청 완료 - User: {}, URL: {}", guestUuid, result.typeInfo());
-            } catch (Exception e) {
-                log.error("파이썬 서버 요청 중 에러 발생", e);
-            }
+        // 5-2. 캐시에 없으면 기존대로 분석 요청
+        try {
+            mlRequestService.sendToPythonServer(guestUuid, result.typeInfo());
+            log.info("파이썬 분석 요청 완료."); // (이전에 피드백받은 로그 마스킹은 MlRequestService 쪽에 잘 하셨죠? ㅎㅎ)
 
-
+            return QrScanResponse.builder()
+                    .guestUuid(guestUuid)
+                    .status("PROCESSING")
+                    .build();
+        } catch (Exception e) {
+            log.error("분석 요청 실패", e);
+            throw new RuntimeException("ML 서버 통신 실패", e);
         }
 
 
-        return response;
+
+
 
     }
     // 스캔 내역 URL 클릭 시 상세 보고서 내려주는 API

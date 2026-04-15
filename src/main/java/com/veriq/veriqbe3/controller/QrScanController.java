@@ -38,7 +38,7 @@ public class QrScanController {
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE) //multipart_form_data 제한
     public ResponseEntity<QrScanResponse> uploadQrImage(    //반환 http body 타입 제한
-        @RequestHeader(value = "guest_uuid", required = false ) String guestUuid,
+        @RequestHeader(value = "guest_uuid" ) String guestUuid,
         @RequestParam("image") MultipartFile image) {
         try {
             QrScanResponse response = qrScanRedisService.processWithRedis(image, guestUuid);
@@ -159,10 +159,17 @@ public class QrScanController {
 
         try {
             // 1. 보안 검증 (기존 로직과 동일하게 유지)
-            if (providedSecret == null || !providedSecret.equals(mlServerSecret)) {
+            if (providedSecret == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("접근 권한이 없습니다.");
             }
 
+            byte[] providedBytes = providedSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            byte[] expectedBytes = mlServerSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+
+// 길이가 다르거나, 내부 바이트가 하나라도 다르면 거절 (비교 시간은 항상 일정함)
+            if (providedBytes.length != expectedBytes.length || !java.security.MessageDigest.isEqual(providedBytes, expectedBytes)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("접근 권한이 없습니다.");
+            }
             // 2. 파이썬이 보내준 메시지 추출
             String ssePayload = objectMapper.writeValueAsString(request);
 
