@@ -100,12 +100,16 @@ public class QrScanRedisService {
                     .guestUuid(guestUuid)
                     .status("PROCESSING")
                     .build();
+        } //파이썬 통신 에러(502)
+        catch (org.springframework.web.client.RestClientException e) {
+            log.error("ML 서버 통신 실패 (RestClientException) - guestUuid: {}", guestUuid, e);
+            throw e; // 이렇게 던져야 컨트롤러가 잡아서 502 Bad Gateway를 내려줍니다.
+
+// 나머지 진짜 알 수 없는 런타임 에러들만 감싸서 던집니다.(500에러-서버에러)
         } catch (Exception e) {
-            log.error("분석 요청 실패", e);
+            log.error("분석 요청 중 알 수 없는 에러", e);
             throw new RuntimeException("ML 서버 통신 실패", e);
         }
-
-
 
 
 

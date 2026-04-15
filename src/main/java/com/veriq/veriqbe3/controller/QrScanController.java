@@ -9,6 +9,7 @@ import com.veriq.veriqbe3.service.QrScanRedisService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +21,7 @@ import jakarta.validation.Valid;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +35,7 @@ public class QrScanController {
     //private final ProcessQrScan processQrScan;  //의존성 주입
     private final QrScanRedisService qrScanRedisService; //   서비스 의존성 주입
     private final ObjectMapper objectMapper;
+    private final RedisTemplate<String, Object> redisTemplate;
 
 
 
@@ -124,6 +127,18 @@ public class QrScanController {
 
             // 1. 서비스 계층에 넘겨서 DB 저장 및 Redis 캐싱을 한 번에 처리!
             // 2. 비밀번호가 맞을 때만 DB 저장 및 캐싱을 진행
+            String idempotencyKey = "callbackdone:" + guestUuid;
+
+// 2. Redis에 방명록 쓰기 시도 (setIfAbsent = 없으면 쓰고 true, 있으면 안 쓰고 false 반환)
+// TTL은 파이썬이 재시도할 만한 넉넉한 시간인 10분 정도로 줍니다.
+            Boolean isFirst = redisTemplate.opsForValue()
+                    .setIfAbsent(idempotencyKey, "PROCESSED", Duration.ofMinutes(10));
+
+// 3. 이미 방명록에 이름이 있다면? (중복 콜백이면) 바로 돌려보냄!
+            if (Boolean.FALSE.equals(isFirst)) {
+                log.info("이미 처리된 중복 콜백 요청입니다. 무시합니다. - guestUuid: {}", guestUuid);
+                return ResponseEntity.ok("이미 처리되었습니다.");
+            }
             qrScanRedisService.saveAndCacheAnalysisResult(resultDto, guestUuid);
             // 3.스캔 히스토리 저장
             qrScanRedisService.saveHistoryToRedis(guestUuid, resultDto);
