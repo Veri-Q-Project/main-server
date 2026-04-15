@@ -294,9 +294,10 @@ public class QrScanRedisService {
                     // 5. InternalDbInfo 빌드
                     .internalDb(ScanHistory.InternalDbInfo.builder()
                             .dbExists(responseDto.internalDb() != null && responseDto.internalDb().exists())
-                            .dbReportCount(responseDto.internalDb() != null ? responseDto.internalDb().reportCount() : 0)
-                            .dbBlockCount(responseDto.internalDb() != null ? responseDto.internalDb().blockCount() : 0)
+                            .dbReportCount(responseDto.internalDb() != null && responseDto.internalDb().reportCount() != null ? responseDto.internalDb().reportCount() : 0)
+                            .dbBlockCount(responseDto.internalDb() != null && responseDto.internalDb().blockCount() != null ? responseDto.internalDb().blockCount() : 0)
                             .build())
+
 
                     // 6. RedirectInfo 빌드
                     .redirect(ScanHistory.RedirectInfo.builder()

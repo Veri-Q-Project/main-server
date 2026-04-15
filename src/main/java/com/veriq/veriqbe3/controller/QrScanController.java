@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.beans.factory.annotation.Value;
+import jakarta.validation.Valid;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -45,7 +46,8 @@ public class QrScanController {
                return ResponseEntity.ok(response);
 
         } catch (Exception e) {
-            e.printStackTrace();
+
+            log.error("QR 스캔 요청 처리 중 에러 발생", e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -155,7 +157,7 @@ public class QrScanController {
     public ResponseEntity<String> analysisProgressCallback(
              // 누구의 파이프인지 식별자 필수!
             @RequestHeader(value = "X-ML-Secret", required = false) String providedSecret,
-            @RequestBody ProgressRequest request) { // { "step": "DOMAIN_CHECK", "message": "도메인 사칭 분석 완료" }
+            @Valid @RequestBody ProgressRequest request) { // { "step": "DOMAIN_CHECK", "message": "도메인 사칭 분석 완료" }
 
         try {
             // 1. 보안 검증 (기존 로직과 동일하게 유지)
@@ -182,6 +184,7 @@ public class QrScanController {
             return ResponseEntity.ok("상태 업데이트 성공!");
 
         } catch (Exception e) {
+            log.error("진행 상태 콜백 처리 중 에러 발생 - guestUuid: {}", request.guestUuid(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("에러 발생");
         }
     }
