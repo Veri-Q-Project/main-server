@@ -1,9 +1,14 @@
 package com.veriq.veriqgateway.dto;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.NoArgsConstructor;
+
 @Getter
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 
 
 public class ScanResponse {
