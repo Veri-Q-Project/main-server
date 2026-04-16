@@ -57,8 +57,24 @@ public class MlRequestService {
             log.info("[ML 분석 요청 발송 성공] User: {}, Host: {}", maskedUuid, safeHost);
 
         } catch (Exception e) {
-            log.error("[ML 분석 요청 발송 실패] User: {}, URL: {}", guestUuid, url, e);
-            throw new RuntimeException("ML 서버 연동 실패");
+            //  [STEP 1] 실패 로그용 마스킹 처리 (성공 로직과 동일하게!)
+            String maskedUuid = (guestUuid != null && guestUuid.length() > 8)
+                    ? guestUuid.substring(0, 8) + "****"
+                    : "UNKNOWN";
+
+            String safeHost = "UNKNOWN_HOST";
+            try {
+                java.net.URI uri = new java.net.URI(url);
+                safeHost = uri.getHost(); // 민감한 파라미터를 제외한 도메인만 추출
+            } catch (Exception ignored) { }
+
+            //  [STEP 2] 마스킹된 정보로 에러 로그 출력
+            // 마지막에 e를 넣어줘야 어떤 통신 에러가 났는지 스택 트레이스가 남습니다.
+            log.error("[ML 분석 요청 발송 실패] User: {}, Host: {}", maskedUuid, safeHost, e);
+
+            //  [STEP 3] 원본 예외(e)를 포함해서 던지기 (상위 컨트롤러의 502 처리를 위해!)
+            // e를 인자로 넘겨야 'Root Cause'가 보존되어 나중에 추적이 가능합니다.
+            throw new RuntimeException("ML 서버 연동 실패", e);
         }
     }
 
