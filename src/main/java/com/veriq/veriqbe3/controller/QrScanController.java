@@ -127,8 +127,8 @@ public class QrScanController {
 
             // 1. 서비스 계층에 넘겨서 DB 저장 및 Redis 캐싱을 한 번에 처리!
             // 2. 비밀번호가 맞을 때만 DB 저장 및 캐싱을 진행
-            String idempotencyKey = "callbackdone:" + guestUuid;
-
+            String safeUuid = (guestUuid != null) ? guestUuid : "unknown";
+            String idempotencyKey = "callbackdone:" + safeUuid + ":" + resultDto.originalUrl();
 // 2. Redis에 방명록 쓰기 시도 (setIfAbsent = 없으면 쓰고 true, 있으면 안 쓰고 false 반환)
 // TTL은 파이썬이 재시도할 만한 넉넉한 시간인 10분 정도로 줍니다.
             Boolean isFirst = redisTemplate.opsForValue()
@@ -214,7 +214,9 @@ public class QrScanController {
             return ResponseEntity.ok("상태 업데이트 성공!");
 
         } catch (Exception e) {
-            log.error("진행 상태 콜백 처리 중 에러 발생 - guestUuid: {}", request.guestUuid(), e);
+            String uuid = (request != null && request.guestUuid() != null) ? request.guestUuid() : "unknown";
+
+            log.error("진행 상태 콜백 처리 중 에러 발생 - guestUuid: {}", uuid, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("에러 발생");
         }
     }

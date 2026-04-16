@@ -78,7 +78,7 @@ public class QrScanRedisService {
         }
 
 // 3. [URL] 처리 로직
-// 3-1. 캐시(Redis) 확인 로직 (Fast-Path)
+// 3-1. 캐시(Redis) 확인 로직
         AnalysisResponse cachedResult = getUrlDetail(result.typeInfo());
         if (cachedResult != null) {
             log.info("[Fast-Path] 캐시랑 db에 존재 - URL: {}", result.typeInfo());
