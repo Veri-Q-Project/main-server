@@ -23,7 +23,7 @@ public class ScanHistory {
     private Long id;
 
     private String guestUuid;
-    @Column(length = 1000)
+    @Column(length = 700)
     private String originalUrl;
 
     private String typeInfo;
