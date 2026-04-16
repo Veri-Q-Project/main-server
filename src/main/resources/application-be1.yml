@@ -39,3 +39,6 @@ google:
 be3:
   api:
     url: "http://veriq-be3:8083/api/v1/scan/upload"
+# 프론트엔드 허용 주소 (도커 환경변수로 덮어쓰기 가능)
+frontend:
+  url: ${FRONTEND_CORS_URL:http://localhost:3000}

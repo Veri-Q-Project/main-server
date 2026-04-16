@@ -7,7 +7,13 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "scan_history",indexes={@Index(name = "idx_final_url", columnList = "finalUrl")})
+@Table(name = "scan_history",indexes={
+        @Index(name = "idx_final_url", columnList = "finalUrl"),
+        // 추가 스캔 보고서 제공시 url을 매게로 하기떄문에 idndexing에 추가,
+        // URL과 스캔 시간을 분리해서 인덱스를 걸어줍니다.
+        @Index(name = "idx_original_url", columnList = "originalUrl"),
+        @Index(name = "idx_scanned_at", columnList = "scannedAt")
+})
 @Getter @Builder @NoArgsConstructor @AllArgsConstructor
 
 public class ScanHistory {

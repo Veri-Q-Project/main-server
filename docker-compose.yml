@@ -38,6 +38,9 @@ services:
       SERVER_PORT: 8081
       GOOGLE_RECAPTCHA_SECRET_KEY: ${GOOGLE_RECAPTCHA_SECRET_KEY}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      ML_SECRET_KEY: ${ML_SECRET_KEY}
+      FRONTEND_CORS_URL: http://34.64.182.89:3000
+
 
       BE3_API_URL: "http://veriq-platform:8083/api/v1/scan/upload"
 
@@ -60,6 +63,8 @@ services:
       SPRING_PROFILES_ACTIVE: be3
       SERVER_PORT: 8083
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      ML_SECRET_KEY: ${ML_SECRET_KEY}
+      FRONTEND_CORS_URL: http://34.64.182.89:3000
 
     depends_on:
       - veriq-db
@@ -74,5 +79,10 @@ services:
     restart: always
     ports:
         - "8000:8000"
+    environment:
+      ML_SECRET_KEY: ${ML_SECRET_KEY}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+
+
     depends_on:
-        - veriq-db
+      - veriq-db
