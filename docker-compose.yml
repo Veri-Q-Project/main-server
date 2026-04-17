@@ -82,6 +82,8 @@ services:
     environment:
       ML_SECRET_KEY: ${ML_SECRET_KEY}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      BE3_CALLBACK_FINAL_URL: "http://veriq-be3:8083/api/v1/scan/callback"
+      BE3_CALLBACK_PROGRESS_URL: "http://veriq-be3:8083/api/v1/scan/callback/progress"
 
 
     depends_on:
