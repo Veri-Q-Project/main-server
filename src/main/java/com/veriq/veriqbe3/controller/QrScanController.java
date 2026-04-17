@@ -188,10 +188,12 @@ public class QrScanController {
              // 누구의 파이프인지 식별자 필수!
             @RequestHeader(value = "X-ML-Secret", required = false) String providedSecret,
             @Valid @RequestBody ProgressRequest request) { // { "step": "DOMAIN_CHECK", "message": "도메인 사칭 분석 완료" }
+        log.info("🔔 [Progress 요청 도착] UUID: {}, 받은 Secret: {}", request.guestUuid(), providedSecret);
 
         try {
             // 1. 보안 검증 (기존 로직과 동일하게 유지)
             if (providedSecret == null) {
+                log.warn("❌ [보안 실패] 파이썬이 Secret을 안 보냈습니다!");
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("접근 권한이 없습니다.");
             }
 
@@ -200,6 +202,7 @@ public class QrScanController {
 
 // 길이가 다르거나, 내부 바이트가 하나라도 다르면 거절 (비교 시간은 항상 일정함)
             if (providedBytes.length != expectedBytes.length || !java.security.MessageDigest.isEqual(providedBytes, expectedBytes)) {
+                log.warn("❌ [보안 실패] Secret 불일치! 기대값: [{}], 받은값: [{}]", mlServerSecret, providedSecret);
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("접근 권한이 없습니다.");
             }
             // 2. 파이썬이 보내준 메시지 추출

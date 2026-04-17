@@ -34,7 +34,6 @@ public class MlRequestService {
             Map<String, String> body = new HashMap<>();
             body.put("url", url);//url:"https://naver.com" 이 json형태로 들어감
             body.put("guestUuid", guestUuid);
-
             // 3. 엔티티 조립 바디랑 헤더 조립
             HttpEntity<Map<String, String>> requestEntity = new HttpEntity<>(body, headers);
 
