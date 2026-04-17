@@ -1,11 +1,12 @@
 package com.veriq.veriqbe3.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.time.LocalDateTime;
 import java.util.List;
-
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record AnalysisResponse(
-        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ssXXX")
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
         LocalDateTime analysisTime,
         String originalUrl,
         HttpsInfo https,
