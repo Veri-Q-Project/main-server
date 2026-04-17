@@ -17,7 +17,7 @@ public class MlRequestService {
     @Value("${ml.api.url}") // application.yml에 정의된 파이썬 서버 URL (예: http://.../analyze)
     private String mlServerUrl;
 
-    @Value("${ml.server.secret}") // 파이썬 서버랑 맞춘 비밀키
+    @Value("${ML_SECRET_KEY}")// 파이썬 서버랑 맞춘 비밀키
     private String mlServerSecret;
 
     private final RestTemplate restTemplate;

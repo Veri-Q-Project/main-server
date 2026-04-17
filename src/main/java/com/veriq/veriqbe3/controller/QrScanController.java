@@ -99,7 +99,7 @@ public class QrScanController {
 
 
     // ML 서버가 분석을 마치고 분석최종결과를 던져주는 콜백 API
-    @Value("${ml.server.secret}")
+    @Value("${ML_SECRET_KEY}")
     private String mlServerSecret;
     @PostMapping("/callback")
     public ResponseEntity<String> analysisCallback(
