@@ -109,6 +109,12 @@ public class QrScanController {
             @RequestBody AnalysisResponse resultDto) {
 
         try {
+            // 🚨 1. 가장 먼저 UUID부터 검사합니다! (입구 컷)
+            if (guestUuid == null || guestUuid.isBlank()) {
+                log.error("❌ [콜백 실패] 파이썬이 헤더에 guest_uuid를 안 보냈습니다! URL: {}", resultDto.originalUrl());
+                // UUID가 없으면 DB 저장도, SSE 통신도 할 필요 없이 바로 반송!
+                return ResponseEntity.badRequest().body("guest_uuid is missing");
+            }
             // [보안 로직] 상수 시간 비교(Constant-time comparison)를 통한 타이밍 공격 방어
             boolean isSecretValid = false;
             if (providedSecret != null && mlServerSecret != null) {
@@ -227,7 +233,7 @@ public class QrScanController {
 
     // 프론트엔드가 파이프를 꽂으러 오는 곳
     @CrossOrigin(origins = "${frontend.url}")//프론트의 주소에 따라 유동, 해당 주소만 파이프 받아들임
-    @GetMapping(value = "/subscribe", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @GetMapping(value = "/subscribe", produces = "text/event-stream;charset=UTF-8")
     public ResponseEntity<SseEmitter> subscribe(@RequestParam("guest_uuid") String guestUuid) {
 
         try {
