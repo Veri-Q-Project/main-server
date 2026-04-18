@@ -34,6 +34,7 @@ ml:
     url: "http://veriq-analysis:8000/analyze" #재조정
 
 
+
 # 프론트엔드 허용 주소 (도커 환경변수로 덮어쓰기 가능)
 frontend:
   url: ${FRONTEND_CORS_URL:http://localhost:3000}

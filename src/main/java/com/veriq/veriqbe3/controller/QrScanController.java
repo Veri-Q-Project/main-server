@@ -36,6 +36,8 @@ public class QrScanController {
     private final QrScanRedisService qrScanRedisService; //   서비스 의존성 주입
     private final ObjectMapper objectMapper;
     private final RedisTemplate<String, Object> redisTemplate;
+    @Value("${ML_SECRET_KEY}")
+    private String mlServerSecret;
 
 
 
@@ -99,8 +101,7 @@ public class QrScanController {
 
 
     // ML 서버가 분석을 마치고 분석최종결과를 던져주는 콜백 API
-    @Value("${ML_SECRET_KEY}")
-    private String mlServerSecret;
+
     @PostMapping("/callback")
     public ResponseEntity<String> analysisCallback(
             @RequestHeader(value = "guest_uuid", required = false) String guestUuid,
