@@ -73,18 +73,18 @@ public class QrScanController {
     }
     //  스캔 내역 및 로딩화면 후 상세 보고서 API 엔드포인트 ,프런트랑 연결
     @GetMapping("/detail")
-    public ResponseEntity<?> getUrlDetail(@RequestParam("url") String url) {
+    public ResponseEntity<AnalysisResponse> getUrlDetail(@RequestParam("url") String url) {
         try {
             log.info("상세 분석 결과 요청 들어옴 - URL: {}", url);
 
-            //  Look-Aside 캐시 로직 호출
+            // Look-Aside 캐시 로직 호출
             AnalysisResponse response = qrScanRedisService.getUrlDetail(url);
 
             if (response == null) {
-                // 캐시에도 없고 DB에도 없는 경우 (분석 중이거나 아예 없는 URL)
+                // 캐시에도 없고 DB에도 없는 경우
                 log.warn("URL 분석 결과를 찾을 수 없습니다: {}", url);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body("해당 URL의 분석 결과를 찾을 수 없습니다.");
+                // ❌ 기존: .body("문자열") -> ✅ 수정: .build()로 본문 없이 404 상태코드만 반환
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
             }
 
             // 성공 시 200 OK와 함께 데이터 쫙 뿌려주기
@@ -92,8 +92,8 @@ public class QrScanController {
 
         } catch (Exception e) {
             log.error("상세 조회 중 서버 에러 발생 - URL: {}", url, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("서버 내부 오류가 발생했습니다.");
+            // ❌ 기존: .body("문자열") -> ✅ 수정: .build()로 본문 없이 500 상태코드만 반환
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
