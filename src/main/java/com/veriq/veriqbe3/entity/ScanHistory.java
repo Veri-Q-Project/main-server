@@ -12,7 +12,8 @@ import java.time.LocalDateTime;
         // 추가 스캔 보고서 제공시 url을 매게로 하기떄문에 idndexing에 추가,
         // URL과 스캔 시간을 분리해서 인덱스를 걸어줍니다.
         @Index(name = "idx_original_url", columnList = "originalUrl"),
-        @Index(name = "idx_scanned_at", columnList = "scannedAt")
+        @Index(name = "idx_scanned_at", columnList = "scannedAt"),
+        @Index(name = "idx_last_analyzed_at", columnList = "lastAnalyzedAt")
 })
 @Getter @Builder @NoArgsConstructor @AllArgsConstructor
 
@@ -30,15 +31,17 @@ public class ScanHistory {
 
     @Enumerated(EnumType.STRING)
     private SchemeType schemeType;
-
+//유재 스캔한 시간
     private LocalDateTime scannedAt;
 
     @PrePersist
     public void prePersist() {
         this.scannedAt = LocalDateTime.now();
     }
-
+//ML서버가 분석하는데 걸린 시간
     private LocalDateTime analysisTime;
+    //  실제 ML 분석이 완료된 시각 (데이터 신선도 체크의 기준)
+    private LocalDateTime lastAnalyzedAt;
     private int totalScore;
     private String riskLevel;
 

@@ -18,6 +18,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -42,9 +43,9 @@ public class QrScanRedisService {
 
     private static final int MAX_HISTORY_SIZE = 50;
     private static final Duration HISTORY_TTL = Duration.ofDays(7);
-    private static final Duration URL_CACHE_TTL = HISTORY_TTL;
 
-    public QrScanResponse processWithRedis(MultipartFile image, String guestUuid) throws Exception {
+
+    public Object processWithRedis(MultipartFile image, String guestUuid) throws Exception {
 
         String url = qrDecoder.decode(image);
         // 2. 디코딩 성공 시, 프론트로 실시간 텍스트만 쏘기!
@@ -78,39 +79,39 @@ public class QrScanRedisService {
         }
 
 // 3. [URL] 처리 로직
-// 3-1. 캐시(Redis) 확인 로직
-        AnalysisResponse cachedResult = getUrlDetail(result.typeInfo());
-        if (cachedResult != null) {
-            log.info("[Fast-Path] 캐시랑 db에 존재 - URL: {}", result.typeInfo());
+        // 4-1. 캐시 및 DB에서 '신선한' 데이터 가져오기 시도
+        AnalysisResponse freshResult = getUrlDetail(result.typeInfo());
+
+        if (freshResult != null) {
+            // 🚨 [핵심 A] 신선한 데이터가 있으면 파이썬 분석 스킵! AnalysisResponse 객체를 통째로 리턴!
+            log.info("[Fast-Path] 신선한 캐시/DB 데이터 적중! 파이썬 분석 생략 - URL: {}", result.typeInfo());
+            return freshResult;
+        }
+
+        // 4-2. 데이터가 아예 없거나 너무 낡았다면? (null이 반환된 경우)
+        try {
+            log.info("데이터가 없거나 오래되었습니다. 파이썬 ML 서버에 분석을 지시합니다. URL: {}", result.typeInfo());
+
+            // 여기서 파이썬 서버로 분석 지시 핑(Ping)을 날립니다.
+            mlRequestService.sendToPythonServer(guestUuid, result.typeInfo());
+
+            // 🚨 [핵심 B] 파이썬이 일하러 갔으니, 프론트에게는 QrScanResponse(로딩 상태)를 리턴!
             return QrScanResponse.builder()
                     .guestUuid(guestUuid)
                     .typeInfo(result.typeInfo())
-                    .status("COMPLETED")
-                    .isUrl(true)           //
-                    .message(decodingMsg)  //
+                    .status("PROCESSING") // 프론트는 이걸 보고 SSE 대기 화면을 띄웁니다.
+                    .isUrl(true)
+                    .message("분석이 시작되었습니다.")
                     .build();
-        }
 
-        // 5-2. 캐시에 없으면 기존대로 분석 요청
-        try {
-            mlRequestService.sendToPythonServer(guestUuid, result.typeInfo());
-            log.info("파이썬 분석 요청 완료."); // (이전에 피드백받은 로그 마스킹은 MlRequestService 쪽에 잘 하셨죠? ㅎㅎ)
-
-            return QrScanResponse.builder()
-                    .guestUuid(guestUuid)
-                    .status("PROCESSING")
-                    .build();
-        } //파이썬 통신 에러(502)
-        catch (org.springframework.web.client.RestClientException e) {
+        } catch (org.springframework.web.client.RestClientException e) {
             log.error("ML 서버 통신 실패 (RestClientException) - guestUuid: {}", guestUuid, e);
-            throw e; // 이렇게 던져야 컨트롤러가 잡아서 502 Bad Gateway를 내려줍니다.
+            throw e; // 컨트롤러가 잡아서 502 Bad Gateway로 처리
 
-// 나머지 진짜 알 수 없는 런타임 에러들만 감싸서 던집니다.(500에러-서버에러)
         } catch (Exception e) {
             log.error("분석 요청 중 알 수 없는 에러", e);
             throw new RuntimeException("ML 서버 통신 실패", e);
         }
-
 
 
     }
@@ -137,26 +138,46 @@ public class QrScanRedisService {
         if (dbHistory.isEmpty()) {
             return null; // DB에도 없으면 분석이 아직 안 끝났거나 없는 URL
         }
+        // 🚨 여기서 history 변수를 명확하게 뽑아냅니다! (에러 해결 핵심)
+        ScanHistory history = dbHistory.get();
 
-        AnalysisResponse dbResponse = convertToAnalysisResponse(dbHistory.get());
 
-        // 다시 요청될 수 있으니 Redis에 캐싱
-        redisTemplate.opsForValue().set(cacheKey, objectMapper.writeValueAsString(dbResponse), URL_CACHE_TTL);
-        log.info("DB 조회 후 Redis 캐싱 및 반환: {}", url);
+        // 3. 신선도 체크
+        if (isStale(history)) {
+            return null; // 상했으면 null (processWithRedis에서 캐치해서 파이썬 호출함)
+        }
 
+        // 4. 신선하면 DTO로 변환 후 캐싱 및 반환
+        AnalysisResponse dbResponse = convertToAnalysisResponse(history);
+        Duration dynamicTtl = calculateDynamicTtl(history.getRiskLevel());
+        redisTemplate.opsForValue().set(cacheKey, objectMapper.writeValueAsString(dbResponse), dynamicTtl);
+        log.info("DB 조회 결과가 신선하여 Redis 캐싱 후 반환 (TTL: {}일) : {}", dynamicTtl.toDays(), url);
         return dbResponse;
+    }
+    /**
+     * 데이터가 유효 기간을 넘었는지 확인
+     */
+    private boolean isStale(ScanHistory history) {
+        if (history.getLastAnalyzedAt() == null) return true;
+
+        long daysPassed = java.time.Duration.between(history.getLastAnalyzedAt(), java.time.LocalDateTime.now()).toDays();
+        // SAFE는 3일, 나머지는 7일을 임계치로 설정
+        long threshold = "SAFE".equals(history.getRiskLevel()) ? 3 : 7;
+
+        return daysPassed >= threshold;
     }
     /**
 
      */
-    public void cacheAnalysisResult(String url, AnalysisResponse resultDto) {
+    public void cacheAnalysisResult(String url, AnalysisResponse resultDto,Duration ttl) {
         try {
             // 1. 상세 리포트 캐싱 (AnalysisResponse 객체를 통째로 JSON으로 변환하여 저장)
             String urlKey = buildUrlCacheKey(url);
             String jsonCache = objectMapper.writeValueAsString(resultDto);
-            redisTemplate.opsForValue().set(urlKey, jsonCache, URL_CACHE_TTL);
+            // 🚨 핵심: 고정된 URL_CACHE_TTL 대신, 밖에서 받아온 동적 ttl을 꽂아줍니다!
+            redisTemplate.opsForValue().set(urlKey, jsonCache, ttl);
 
-            log.info("URL 상세 분석 결과 캐싱 완료: {}", url);
+            log.info("URL 상세 분석 결과 캐싱 완료: {} (적용된 TTL: {}일)", url, ttl.toDays());
 
         } catch (Exception e) {
             log.error("Redis 캐싱 실패 - URL: {}", url, e);
@@ -249,6 +270,18 @@ public class QrScanRedisService {
                 entity.getRiskLevel()
         );
     }
+    /**
+     * [추가된 핵심 로직] 위험도에 따른 차등 TTL 계산 메서드
+     */
+    private Duration calculateDynamicTtl(String riskLevel) {
+        if (riskLevel == null) return Duration.ofDays(1); // 안전장치 (기본값)
+
+        return switch (riskLevel.toUpperCase()) {
+            case "SAFE" -> Duration.ofDays(3);              // 안전하면 3일마다 재검증
+            case "MALICIOUS", "CAUTION" -> Duration.ofDays(7); // 위험/의심은 7일간 길게 유지
+            default -> Duration.ofDays(1);                  // 기타 상태는 하루
+        };
+    }
 
     @Transactional
     // DB 저장하다 에러 나면 롤백!,
@@ -268,6 +301,7 @@ public class QrScanRedisService {
                     .typeInfo(url) // 보통 원본 URL을 넣습니다
                     .schemeType(SchemeType.WEB) // 콜백으로 오는 건 사실상 모두 WEB이라고 가정
                     .analysisTime(responseDto.analysisTime())
+                    .lastAnalyzedAt(LocalDateTime.now()) // 🔥 현재 시간 기록
                     .totalScore(responseDto.score())
                     .riskLevel(responseDto.riskLevel())
 
@@ -331,12 +365,15 @@ public class QrScanRedisService {
             log.info("DB 저장 완료: {}", url);
 
             // ==========================================
-            // 3. Redis 캐시 워밍
+            // 3. 차등 TTL 적용하여 Redis 캐시 워밍 (수정된 부분!)
             // ==========================================
-            cacheAnalysisResult(url, responseDto);
+            Duration dynamicTtl = calculateDynamicTtl(responseDto.riskLevel());
+            cacheAnalysisResult(url, responseDto, dynamicTtl);
 
-            log.info("DB 저장 완료");
-            // 프론트엔드로 프로세스 완료 알림
+            log.info("모든 저장 및 동적 캐싱 프로세스 완료");
+            // 프론트엔드로 프로세스 완료 알림 진행...
+
+
 
 
         } catch (Exception e) {
