@@ -58,9 +58,12 @@ public record AnalysisResponse(
     public record CertificateInfo(
             boolean valid,
             String issuer,
-            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss[.SSSSSS][X]")
+            // 🚨 [여기가 핵심 수정 포인트!]
+            // 파이썬의 "Mar 10 00:00:00 2026 GMT" 형식을 읽기 위한 포맷입니다.
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "MMM dd HH:mm:ss yyyy z", locale = "en")
             LocalDateTime validFrom,
-            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss[.SSSSSS][X]")
+
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "MMM dd HH:mm:ss yyyy z", locale = "en")
             LocalDateTime validTo
     ) {}
 }
