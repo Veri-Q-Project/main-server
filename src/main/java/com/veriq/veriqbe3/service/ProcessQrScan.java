@@ -42,7 +42,7 @@ public class ProcessQrScan {
             new AnalysisResponse.InternalDbInfo(false, 0, 0),
             new AnalysisResponse.RedirectInfo(url, 0),
             new AnalysisResponse.ServerInfo("Nginx", "KR",
-                    new AnalysisResponse.CertificateInfo(true, "DigiCert", LocalDateTime.now(), LocalDateTime.now().plusYears(1))),
+            new AnalysisResponse.CertificateInfo(true, "DigiCert", LocalDateTime.now(), LocalDateTime.now().plusYears(1))),
             95,      // score
             "SAFE"   // riskLevel
             );
