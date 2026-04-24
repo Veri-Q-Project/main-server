@@ -16,7 +16,7 @@ public record AnalysisResponse(
         InternalDbInfo internalDb,
         RedirectInfo redirect,
         ServerInfo serverInfo,
-        int score,
+        Integer score,
         String riskLevel
 ) {
     public record HttpsInfo(
@@ -29,7 +29,7 @@ public record AnalysisResponse(
 
     public record MlInfo(
             List<String> threats,
-            int score
+            Integer score
     ) {}
 
     public record ExternalApiInfo(
@@ -46,7 +46,7 @@ public record AnalysisResponse(
 
     public record RedirectInfo(
             String finalUrl,
-            int redirectCount
+            Integer redirectCount
     ) {}
 
     public record ServerInfo(
