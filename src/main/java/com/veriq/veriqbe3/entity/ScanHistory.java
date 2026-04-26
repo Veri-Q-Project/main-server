@@ -39,7 +39,7 @@ public class ScanHistory {
         this.scannedAt = LocalDateTime.now();
     }
 //ML서버가 분석한 시간
-    private LocalDateTime analysisTime;
+    private String analysisTime;
     private Integer totalScore;
     private String riskLevel;
 

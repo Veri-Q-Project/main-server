@@ -3,6 +3,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.veriq.veriqbe3.domain.RiskLevel;
 import com.veriq.veriqbe3.dto.AnalysisResponse;
 import com.veriq.veriqbe3.dto.ProgressRequest;
+import java.time.ZonedDateTime;
 import com.veriq.veriqbe3.dto.QrScanResponse;
 import com.veriq.veriqbe3.dto.RedisScanHistoryDto;
 import com.veriq.veriqbe3.entity.ScanHistory;
@@ -19,7 +20,9 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 
 import java.io.IOException;
+
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -152,7 +155,7 @@ public class QrScanRedisService {
                     .schemeType(SchemeType.WEB)
 
                     // 🚨 핵심 1: ML 분석 시간은 기존 캐시에 있던 '과거 시간'을 그대로 유지!
-                    .analysisTime(responseDto.analysisTime())
+                    .analysisTime(cleanDateString(responseDto.analysisTime()))
 
                     // 🚨 핵심 2: null 방어 로직 (이전에 수정한 것과 동일하게 적용)
                     .totalScore(responseDto.score() != null ? responseDto.score() : 0)
@@ -268,11 +271,22 @@ public class QrScanRedisService {
     private boolean isStale(ScanHistory history) {
         if (history.getAnalysisTime() == null) return true;
 
-        long daysPassed = java.time.Duration.between(history.getAnalysisTime(), java.time.LocalDateTime.now()).toDays();
-        // SAFE는 1일, 나머지는 3일을 임계치로 설정
-        long threshold = "SAFE".equalsIgnoreCase(history.getRiskLevel()) ? 1 : 3;
+        try {
+            String rawDate = history.getAnalysisTime().replaceAll("\\s{2,}", " ");
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMM d HH:mm:ss yyyy z", Locale.ENGLISH);
 
-        return daysPassed >= threshold;
+            // 🚨 LocalDateTime 대신 ZonedDateTime 사용 (GMT 시간대까지 완벽하게 소화)
+            ZonedDateTime analysisDateTime = ZonedDateTime.parse(rawDate, formatter);
+
+            // 🚨 현재 시간도 ZonedDateTime.now()로 맞춰서 비교
+            long daysPassed = java.time.Duration.between(analysisDateTime, ZonedDateTime.now()).toDays();
+            long threshold = "SAFE".equalsIgnoreCase(history.getRiskLevel()) ? 1 : 3;
+
+            return daysPassed >= threshold;
+        } catch (Exception e) {
+            log.warn("날짜 파싱 실패로 재분석 유도: {}", history.getAnalysisTime());
+            return true;
+        }
     }
     /**
 
@@ -434,7 +448,7 @@ public class QrScanRedisService {
                     .originalUrl(url)
                     .typeInfo(url) // 보통 원본 URL을 넣습니다
                     .schemeType(SchemeType.WEB) // 콜백으로 오는 건 사실상 모두 WEB이라고 가정
-                    .analysisTime(responseDto.analysisTime())
+                    .analysisTime(cleanDateString(responseDto.analysisTime()))
                     .totalScore(responseDto.score() != null ? responseDto.score() : 0)
                     .riskLevel(responseDto.riskLevel() != null ? responseDto.riskLevel().name() : "SUSPICIOUS")
 

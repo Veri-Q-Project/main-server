@@ -9,8 +9,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record AnalysisResponse(
-        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss[.SSSSSS]")
-        LocalDateTime analysisTime,
+        String analysisTime,
         String originalUrl,
         HttpsInfo https,
         ShortUrlInfo shortUrl,
