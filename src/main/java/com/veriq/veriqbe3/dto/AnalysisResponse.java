@@ -1,7 +1,10 @@
 package com.veriq.veriqbe3.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.veriq.veriqbe3.domain.RiskLevel;
+
 import java.time.LocalDateTime;
 import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -17,7 +20,7 @@ public record AnalysisResponse(
         RedirectInfo redirect,
         ServerInfo serverInfo,
         Integer score,
-        String riskLevel
+        RiskLevel riskLevel
 ) {
     public record HttpsInfo(
             boolean isSecure
@@ -29,6 +32,7 @@ public record AnalysisResponse(
 
     public record MlInfo(
             List<String> threats,
+            @JsonAlias({"mlScore", "score"})
             Integer score
     ) {}
 
