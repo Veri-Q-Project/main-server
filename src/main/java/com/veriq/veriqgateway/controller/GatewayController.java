@@ -123,7 +123,7 @@ public class GatewayController {
                     .guestUuid(be3Data.getGuestUuid())
                     .status(be3Data.getStatus())
                     .message(be3Data.getMessage())
-                    .isUrl(be3Data.isUrl())
+                    .isUrl(be3Data.getIsUrl())
                     .schemeType(be3Data.getSchemeType() != null ? be3Data.getSchemeType().name() : null)
                     .typeInfo(be3Data.getTypeInfo())
                     .build();
