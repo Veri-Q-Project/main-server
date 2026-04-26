@@ -127,6 +127,16 @@ public class QrScanRedisService {
 
     }
     /**
+     * [추가] 파이썬이 보낸 가변 공백 날짜 문자열(예: "Jun  8")을 깔끔하게(공백 1개) 정제하는 헬퍼 메서드
+     */
+    private String cleanDateString(String rawDate) {
+        if (rawDate == null || rawDate.isBlank()) {
+            return null;
+        }
+        // 공백이 2개 이상 연속된 것을 공백 1개로 치환합니다.
+        return rawDate.replaceAll("\\s{2,}", " ");
+    }
+    /**
      * [Fast-Path 전용] 캐시/DB 적중 시, 분석 없이 '방문 기록'만 새로 남기는 메서드
      */
     public void saveHitHistory(AnalysisResponse responseDto, String guestUuid) {
@@ -193,8 +203,8 @@ public class QrScanRedisService {
                                     ? ScanHistory.CertificateInfo.builder()
                                     .certValid(responseDto.serverInfo().certificate().valid())
                                     .certIssuer(responseDto.serverInfo().certificate().issuer())
-                                    .certValidFrom(responseDto.serverInfo().certificate().validFrom())
-                                    .certValidTo(responseDto.serverInfo().certificate().validTo())
+                                    .certValidFrom(cleanDateString(responseDto.serverInfo().certificate().validFrom()))
+                                    .certValidTo(cleanDateString(responseDto.serverInfo().certificate().validTo()))
                                     .build()
                                     : null)
                             .build())
@@ -476,8 +486,8 @@ public class QrScanRedisService {
                                     ? ScanHistory.CertificateInfo.builder()
                                     .certValid(responseDto.serverInfo().certificate().valid())
                                     .certIssuer(responseDto.serverInfo().certificate().issuer())
-                                    .certValidFrom(responseDto.serverInfo().certificate().validFrom())
-                                    .certValidTo(responseDto.serverInfo().certificate().validTo())
+                                    .certValidFrom(cleanDateString(responseDto.serverInfo().certificate().validFrom()))
+                                    .certValidTo(cleanDateString(responseDto.serverInfo().certificate().validTo()))
                                     .build()
                                     : null)
                             .build())
@@ -608,3 +618,4 @@ public class QrScanRedisService {
 
 
 }
+

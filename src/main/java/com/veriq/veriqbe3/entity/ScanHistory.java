@@ -94,7 +94,7 @@ public class ScanHistory {
     public static class CertificateInfo {
         private boolean certValid;
         private String certIssuer;
-        private LocalDateTime certValidFrom;
-        private LocalDateTime certValidTo;
+        private String certValidFrom;
+        private String certValidTo;
     }
 }
