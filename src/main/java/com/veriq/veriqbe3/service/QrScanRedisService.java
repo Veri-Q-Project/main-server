@@ -88,7 +88,15 @@ public class QrScanRedisService {
 
             log.info("[Fast-Path] 신선한 캐시/DB 데이터 적중! 파이썬 분석 생략 - URL: {}", result.typeInfo());
             saveHitHistory(freshResult, guestUuid);
-            return freshResult;
+            return QrScanResponse.builder()
+                    .guestUuid(guestUuid)
+                    .typeInfo(result.typeInfo())
+                    .status("COMPLETED") // 이미 끝났으니 완료 상태
+                    .isUrl(true)
+                    .message("안전하게 분석된 기존 이력이 있습니다.")
+                    // 필요하다면 QrScanResponse 안에 AnalysisResponse를 담을 수 있는
+                    // 필드(예: private AnalysisResponse detailResult;)를 하나 만들어서 넣어주는 것이 가장 좋습니다.
+                    .build();
         }
 
         // 4-2. 데이터가 아예 없거나 너무 낡았다면? (null이 반환된 경우)
