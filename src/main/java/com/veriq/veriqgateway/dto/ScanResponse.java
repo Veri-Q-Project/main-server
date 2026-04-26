@@ -1,12 +1,10 @@
 package com.veriq.veriqgateway.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
+import lombok.*;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.NoArgsConstructor;
 
 @Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
