@@ -11,6 +11,7 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: veriq_db
+      TZ: Asia/Seoul
     volumes:
       - ./mysql_data:/var/lib/mysql
 
@@ -21,14 +22,16 @@ services:
     restart: always
     ports:
       - "127.0.0.1:6379:6379"
+    environment:
+      TZ: Asia/Seoul # 👈 Redis 타임존 설정
 
-  # 3. Spring BE1 (Gateway - 박상민 )
+  # 3. Spring BE1 (Gateway)
   veriq-gateway:
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        - MAIN_CLASS=com.veriq.veriqgateway.VeriQGatewayApplication # 👈 Gateway 메인 지정
+        - MAIN_CLASS=com.veriq.veriqgateway.VeriQGatewayApplication
     container_name: veriq-be1
     restart: always
     ports:
@@ -36,14 +39,12 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: be1
       SERVER_PORT: 8081
+      TZ: Asia/Seoul # 👈 자바 앱 타임존 설정
       GOOGLE_RECAPTCHA_SECRET_KEY: ${GOOGLE_RECAPTCHA_SECRET_KEY}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       ML_SECRET_KEY: ${ML_SECRET_KEY}
       FRONTEND_CORS_URL: http://34.64.182.89:3000
-
-
       BE3_API_URL: "http://veriq-platform:8083/api/v1/scan/upload"
-
     depends_on:
       - veriq-db
       - veriq-redis
@@ -62,10 +63,12 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: be3
       SERVER_PORT: 8083
+      TZ: Asia/Seoul # 👈 자바 앱 타임존 설정
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       ML_SECRET_KEY: ${ML_SECRET_KEY}
       FRONTEND_CORS_URL: http://34.64.182.89:3000
-
+      # DB 연결 시 타임존 파라미터를 명시적으로 추가하는 것이 좋습니다.
+      # 예: jdbc:mysql://veriq-db:3306/veriq_db?serverTimezone=Asia/Seoul
     depends_on:
       - veriq-db
       - veriq-redis
@@ -78,13 +81,12 @@ services:
     container_name: veriq-analysis
     restart: always
     ports:
-        - "8000:8000"
+      - "8000:8000"
     environment:
+      TZ: Asia/Seoul # 👈 파이썬 분석 엔진 타임존 설정
       ML_SECRET_KEY: ${ML_SECRET_KEY}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       BE3_CALLBACK_FINAL_URL: "http://veriq-be3:8083/api/v1/scan/callback"
       BE3_CALLBACK_PROGRESS_URL: "http://veriq-be3:8083/api/v1/scan/callback/progress"
-
-
     depends_on:
       - veriq-db
