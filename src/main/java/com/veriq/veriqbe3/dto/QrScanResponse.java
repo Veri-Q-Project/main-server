@@ -17,6 +17,6 @@ public class QrScanResponse {
     private String typeInfo;
     private String status;
     @JsonProperty("isUrl")
-    private boolean isUrl;
+    private Boolean isUrl;
     private String message;
 }
