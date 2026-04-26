@@ -115,6 +115,90 @@ public class QrScanRedisService {
 
 
     }
+    /**
+     * [Fast-Path 전용] 캐시/DB 적중 시, 분석 없이 '방문 기록'만 새로 남기는 메서드
+     */
+    public void saveHitHistory(AnalysisResponse responseDto, String guestUuid) {
+        try {
+            String url = responseDto.originalUrl();
+            String safeGuestUuid = (guestUuid != null && !guestUuid.isBlank()) ? guestUuid : "ANONYMOUS";
+
+            // 기존 분석 결과(responseDto)를 복사하되, '새로운 엔티티'를 만듭니다.
+            ScanHistory hitHistory = ScanHistory.builder()
+                    .guestUuid(safeGuestUuid)
+                    .originalUrl(url)
+                    .typeInfo(url)
+                    .schemeType(SchemeType.WEB)
+
+                    // 🚨 핵심 1: ML 분석 시간은 기존 캐시에 있던 '과거 시간'을 그대로 유지!
+                    .analysisTime(responseDto.analysisTime())
+
+                    // 🚨 핵심 2: null 방어 로직 (이전에 수정한 것과 동일하게 적용)
+                    .totalScore(responseDto.score() != null ? responseDto.score() : 0)
+                    .riskLevel(responseDto.riskLevel())
+
+                    // 1. HttpsInfo
+                    .https(ScanHistory.HttpsInfo.builder()
+                            .isSecure(responseDto.https() != null && responseDto.https().isSecure())
+                            .build())
+
+                    // 2. ShortUrlInfo
+                    .shortUrl(ScanHistory.ShortUrlInfo.builder()
+                            .isShortened(responseDto.shortUrl() != null && responseDto.shortUrl().isShortened())
+                            .build())
+
+                    // 3. MlInfo (null 방어)
+                    .ml(ScanHistory.MlInfo.builder()
+                            .threats(responseDto.ml() != null && responseDto.ml().threats() != null
+                                    ? String.join(", ", responseDto.ml().threats()) : null)
+                            .mlScore(responseDto.ml() != null && responseDto.ml().score() != null ? responseDto.ml().score() : 0)
+                            .build())
+
+                    // 4. ExternalApiInfo
+                    .externalApi(ScanHistory.ExternalApiInfo.builder()
+                            .apiChecked(responseDto.externalApi() != null && responseDto.externalApi().checked())
+                            .apiProvider(responseDto.externalApi() != null ? responseDto.externalApi().provider() : null)
+                            .apiResult(responseDto.externalApi() != null ? responseDto.externalApi().result() : null)
+                            .build())
+
+                    // 5. InternalDbInfo
+                    .internalDb(ScanHistory.InternalDbInfo.builder()
+                            .dbExists(responseDto.internalDb() != null && responseDto.internalDb().exists())
+                            .dbReportCount(responseDto.internalDb() != null && responseDto.internalDb().reportCount() != null ? responseDto.internalDb().reportCount() : 0)
+                            .dbBlockCount(responseDto.internalDb() != null && responseDto.internalDb().blockCount() != null ? responseDto.internalDb().blockCount() : 0)
+                            .build())
+
+                    // 6. RedirectInfo (null 방어)
+                    .redirect(ScanHistory.RedirectInfo.builder()
+                            .finalUrl(responseDto.redirect() != null ? responseDto.redirect().finalUrl() : url)
+                            .redirectCount(responseDto.redirect() != null && responseDto.redirect().redirectCount() != null ? responseDto.redirect().redirectCount() : 0)
+                            .build())
+
+                    // 7. ServerInfo 및 CertificateInfo
+                    .serverInfo(ScanHistory.ServerInfo.builder()
+                            .serverType(responseDto.serverInfo() != null ? responseDto.serverInfo().type() : null)
+                            .serverLocation(responseDto.serverInfo() != null ? responseDto.serverInfo().location() : null)
+                            .certificate(responseDto.serverInfo() != null && responseDto.serverInfo().certificate() != null
+                                    ? ScanHistory.CertificateInfo.builder()
+                                    .certValid(responseDto.serverInfo().certificate().valid())
+                                    .certIssuer(responseDto.serverInfo().certificate().issuer())
+                                    .certValidFrom(responseDto.serverInfo().certificate().validFrom())
+                                    .certValidTo(responseDto.serverInfo().certificate().validTo())
+                                    .build()
+                                    : null)
+                            .build())
+                    .build();
+
+            // 🚨 핵심 3: 새로운 엔티티로 DB에 Insert!
+            // 여기서 @PrePersist가 발동해서 hitHistory.scannedAt 에 '현재 스캔 시간'이 자동으로 들어갑니다!
+            scanHistoryRepository.save(hitHistory);
+
+            log.info("캐시 적중 - 새로운 스캔 히스토리(방문 기록) DB 저장 완료: {}", url);
+
+        } catch (Exception e) {
+            log.error("캐시 적중 히스토리 저장 중 에러 발생", e);
+        }
+    }
     // 스캔 내역 URL 클릭 시 상세 보고서 내려주는 API
     public AnalysisResponse getUrlDetail(String url) throws Exception {
         String cacheKey = buildUrlCacheKey(url);
@@ -158,9 +242,9 @@ public class QrScanRedisService {
      * 데이터가 유효 기간을 넘었는지 확인
      */
     private boolean isStale(ScanHistory history) {
-        if (history.getLastAnalyzedAt() == null) return true;
+        if (history.getAnalysisTime() == null) return true;
 
-        long daysPassed = java.time.Duration.between(history.getLastAnalyzedAt(), java.time.LocalDateTime.now()).toDays();
+        long daysPassed = java.time.Duration.between(history.getAnalysisTime(), java.time.LocalDateTime.now()).toDays();
         // SAFE는 3일, 나머지는 7일을 임계치로 설정
         long threshold = "SAFE".equals(history.getRiskLevel()) ? 3 : 7;
 
@@ -274,11 +358,11 @@ public class QrScanRedisService {
      * [추가된 핵심 로직] 위험도에 따른 차등 TTL 계산 메서드
      */
     private Duration calculateDynamicTtl(String riskLevel) {
-        if (riskLevel == null) return Duration.ofDays(1); // 안전장치 (기본값)
+        if (riskLevel == null) return Duration.ofDays(2); // 안전장치 (기본값)
 
         return switch (riskLevel.toUpperCase()) {
-            case "SAFE" -> Duration.ofDays(3);              // 안전하면 3일마다 재검증
-            case "MALICIOUS", "CAUTION" -> Duration.ofDays(7); // 위험/의심은 7일간 길게 유지
+            case "SAFE" -> Duration.ofDays(1);              // 안전하면 3일마다 재검증
+            case "SUSPICIOUS", " DANGER" -> Duration.ofDays(3); // 위험/의심은 7일간 길게 유지
             default -> Duration.ofDays(1);                  // 기타 상태는 하루
         };
     }
@@ -301,7 +385,6 @@ public class QrScanRedisService {
                     .typeInfo(url) // 보통 원본 URL을 넣습니다
                     .schemeType(SchemeType.WEB) // 콜백으로 오는 건 사실상 모두 WEB이라고 가정
                     .analysisTime(responseDto.analysisTime())
-                    .lastAnalyzedAt(LocalDateTime.now()) // 🔥 현재 시간 기록
                     .totalScore(responseDto.score())
                     .riskLevel(responseDto.riskLevel())
 
