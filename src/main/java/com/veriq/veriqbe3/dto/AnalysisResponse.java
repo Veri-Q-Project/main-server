@@ -1,5 +1,5 @@
 package com.veriq.veriqbe3.dto;
-
+import io.swagger.v3.oas.annotations.media.Schema;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.time.LocalDateTime;
@@ -28,7 +28,29 @@ public record AnalysisResponse(
     ) {}
 
     public record MlInfo(
+            @Schema(
+                    // 1. description에 카테고리별로 예쁘게 정리해서 넣어줍니다.
+                    description = "###  탐지 위협 카테고리 상세\n" +
+                            "**1. 리다이렉트 관련**\n" +
+                            "- `too_many_redirects`, `loop_detected`, `invalid_location`\n\n" +
+                            "**2. URL 구조 관련**\n" +
+                            "- `shortened_url`, `embedded_url`, `percent_encoding_detected`, `double_encoding_suspected`\n\n" +
+                            "**3. 구글 세이프 브라우징(GSB)**\n" +
+                            "- `MALWARE`, `SOCIAL_ENGINEERING`, `UNWANTED_SOFTWARE`, `POTENTIALLY_HARMFUL_APPLICATION`\n\n" +
+                            "**4. 기타 탐지**\n" +
+                            "- `suspicious_param_detected`, `suspicious_keyword_detected`",
+
+                    // 2. 실제 값 리스트는 가흔님 가이드대로 플래그들만 나열합니다.
+                    allowableValues = {
+                            "too_many_redirects", "loop_detected", "invalid_location",
+                            "shortened_url", "embedded_url", "percent_encoding_detected", "double_encoding_suspected",
+                            "MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION",
+                            "suspicious_param_detected", "suspicious_keyword_detected"
+                    },
+                    example = "['too_many_redirects', 'MALWARE']"
+            )
             List<String> threats,
+            @Schema(description = "ML 분석 점수", example = "85")
             Integer score
     ) {}
 

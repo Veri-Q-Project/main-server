@@ -1,4 +1,5 @@
 package com.veriq.veriqbe3.dto;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -11,12 +12,16 @@ import java.time.format.DateTimeFormatter;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-
+@Schema(description = "QR 스캔 이력 상세 데이터")
 public class RedisScanHistoryDto {
+    @Schema(description = "URL 스키마 타입", example = "URL")
     private String schemeType;
+    @Schema(description = "원본 URL 정보 또는 텍스트 내용", example = "http://naver-login-check.xyz")
     private String typeInfo;// 프론트에서 보여줄 원본 URL (예: https://www.naver.com)
     //private String status;
+    @Schema(description = "스캔 일시", example = "2026-04-26T18:15:30")
     private String scannedAt;    // 스캔시간
+    @Schema(description = "위험도 레벨 (SAFE, SUSPICIOUS, DANGER)", example = "DANGER")
     private String riskLevel;
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 

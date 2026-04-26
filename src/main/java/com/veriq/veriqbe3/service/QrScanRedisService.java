@@ -164,25 +164,52 @@ public class QrScanRedisService {
     }
 
     public void saveHistoryToRedis(String guestUuid, AnalysisResponse mlResponse) {
-        // 방어 로직: UUID가 없거나 비어있거나 익명이면, 저장하지 않고 그냥 반환
+        // 1. 방어 로직: 저장할 필요가 없는 경우 즉시 반환
         if (guestUuid == null || guestUuid.isBlank() || guestUuid.equals("ANONYMOUS")) {
             return;
         }
+
         try {
             String historyKey = "history:" + guestUuid;
-            //  QR 원본 정보와 ML 분석 결과를 합쳐서 히스토리 DTO 생성!
-            RedisScanHistoryDto item = RedisScanHistoryDto.from(mlResponse);
-            String jsonItem = objectMapper.writeValueAsString(item);
-            // Redis 리스트의 맨 앞(최신)에 밀어 넣기
-            redisTemplate.opsForList().leftPush(historyKey, jsonItem);
-            // 항상 50개만 남기고 옛날 데이터는 잘라버림
+            RedisScanHistoryDto newItem = RedisScanHistoryDto.from(mlResponse);
+
+            // 2. 기존 히스토리 전체 조회 (0부터 끝까지)
+            List<String> rawHistory = redisTemplate.opsForList().range(historyKey, 0, -1);
+            List<RedisScanHistoryDto> currentHistory = new ArrayList<>();
+
+            if (rawHistory != null) {
+                for (String json : rawHistory) {
+                    currentHistory.add(objectMapper.readValue(json, RedisScanHistoryDto.class));
+                }
+
+                // 3. 중복 제거: 동일한 URL(typeInfo)이 있다면 리스트에서 삭제
+                currentHistory.removeIf(oldItem ->
+                        oldItem.getTypeInfo().equals(newItem.getTypeInfo())
+                );
+            }
+
+            // 4. Redis 데이터 갱신 (전체 삭제 후 정제된 데이터 재삽입)
+            redisTemplate.delete(historyKey);
+
+            // 새 항목(최신)을 리스트에 추가
+            String jsonNewItem = objectMapper.writeValueAsString(newItem);
+            redisTemplate.opsForList().leftPush(historyKey, jsonNewItem);
+
+            // 기존 데이터들 중복 제거된 상태로 다시 추가
+            if (!currentHistory.isEmpty()) {
+                for (RedisScanHistoryDto oldItem : currentHistory) {
+                    redisTemplate.opsForList().rightPush(historyKey, objectMapper.writeValueAsString(oldItem));
+                }
+            }
+
+            // 5. 최신 데이터 50개 유지 및 유효기간 설정
             redisTemplate.opsForList().trim(historyKey, 0, MAX_HISTORY_SIZE - 1);
             redisTemplate.expire(historyKey, HISTORY_TTL);
-        } catch (Exception e) {
-            log.error("Redis 히스토리 저장 실패 - guestUuid: {}", guestUuid, e);
-        }
 
-      }
+        } catch (Exception e) {
+            log.error("Redis 히스토리 저장 중 중복 제거 실패 - guestUuid: {}", guestUuid, e);
+        }
+    }
     /**
      * URL 캐시 키를 안전하게 정규화하고 해싱하는 헬퍼 메서드
      */
