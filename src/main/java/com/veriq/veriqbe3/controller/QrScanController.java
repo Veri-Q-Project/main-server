@@ -2,9 +2,6 @@ package com.veriq.veriqbe3.controller;
 
 import com.veriq.veriqbe3.dto.AnalysisResponse;
 import com.veriq.veriqbe3.dto.ProgressRequest;
-import com.veriq.veriqbe3.dto.QrScanResponse;
-import com.veriq.veriqbe3.service.MlRequestService;
-import com.veriq.veriqbe3.service.ProcessQrScan;
 import com.veriq.veriqbe3.service.QrScanRedisService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;

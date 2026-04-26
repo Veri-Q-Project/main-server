@@ -1,5 +1,6 @@
 package com.veriq.veriqbe3.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.veriq.veriqbe3.domain.RiskLevel;
 import com.veriq.veriqbe3.dto.AnalysisResponse;
 import com.veriq.veriqbe3.dto.ProgressRequest;
 import com.veriq.veriqbe3.dto.QrScanResponse;
@@ -84,7 +85,9 @@ public class QrScanRedisService {
 
         if (freshResult != null) {
             // 🚨 [핵심 A] 신선한 데이터가 있으면 파이썬 분석 스킵! AnalysisResponse 객체를 통째로 리턴!
+
             log.info("[Fast-Path] 신선한 캐시/DB 데이터 적중! 파이썬 분석 생략 - URL: {}", result.typeInfo());
+            saveHitHistory(freshResult, guestUuid);
             return freshResult;
         }
 
@@ -135,7 +138,7 @@ public class QrScanRedisService {
 
                     // 🚨 핵심 2: null 방어 로직 (이전에 수정한 것과 동일하게 적용)
                     .totalScore(responseDto.score() != null ? responseDto.score() : 0)
-                    .riskLevel(responseDto.riskLevel())
+                    .riskLevel(responseDto.riskLevel() != null ? responseDto.riskLevel().name() : "SUSPICIOUS")
 
                     // 1. HttpsInfo
                     .https(ScanHistory.HttpsInfo.builder()
@@ -194,6 +197,8 @@ public class QrScanRedisService {
             scanHistoryRepository.save(hitHistory);
 
             log.info("캐시 적중 - 새로운 스캔 히스토리(방문 기록) DB 저장 완료: {}", url);
+            //  유저 개인의 Redis 히스토리 리스트에도 추가
+            saveHistoryToRedis(guestUuid, responseDto);
 
         } catch (Exception e) {
             log.error("캐시 적중 히스토리 저장 중 에러 발생", e);
@@ -218,6 +223,7 @@ public class QrScanRedisService {
             }
         }
         //  Redis에 없으면 DB에서 조회
+        //스캔한 내역중 최신 내역을 db에서 뽑아옴
         Optional<ScanHistory> dbHistory = scanHistoryRepository.findFirstByOriginalUrlOrderByScannedAtDesc(url);
         if (dbHistory.isEmpty()) {
             return null; // DB에도 없으면 분석이 아직 안 끝났거나 없는 URL
@@ -233,20 +239,20 @@ public class QrScanRedisService {
 
         // 4. 신선하면 DTO로 변환 후 캐싱 및 반환
         AnalysisResponse dbResponse = convertToAnalysisResponse(history);
-        Duration dynamicTtl = calculateDynamicTtl(history.getRiskLevel());
+        Duration dynamicTtl = calculateDynamicTtl(RiskLevel.from(history.getRiskLevel()));
         redisTemplate.opsForValue().set(cacheKey, objectMapper.writeValueAsString(dbResponse), dynamicTtl);
         log.info("DB 조회 결과가 신선하여 Redis 캐싱 후 반환 (TTL: {}일) : {}", dynamicTtl.toDays(), url);
         return dbResponse;
     }
     /**
-     * 데이터가 유효 기간을 넘었는지 확인
+     * 데이터가 유효 기간을 넘었는지 확인//db 데이터 갱신(분석시간 위주)
      */
     private boolean isStale(ScanHistory history) {
         if (history.getAnalysisTime() == null) return true;
 
         long daysPassed = java.time.Duration.between(history.getAnalysisTime(), java.time.LocalDateTime.now()).toDays();
-        // SAFE는 3일, 나머지는 7일을 임계치로 설정
-        long threshold = "SAFE".equals(history.getRiskLevel()) ? 3 : 7;
+        // SAFE는 1일, 나머지는 3일을 임계치로 설정
+        long threshold = "SAFE".equalsIgnoreCase(history.getRiskLevel()) ? 1 : 3;
 
         return daysPassed >= threshold;
     }
@@ -351,19 +357,18 @@ public class QrScanRedisService {
                         ) : null
                 ) : null,
                 entity.getTotalScore(),
-                entity.getRiskLevel()
+                RiskLevel.from(entity.getRiskLevel())
         );
     }
     /**
-     * [추가된 핵심 로직] 위험도에 따른 차등 TTL 계산 메서드
+     * [추가된 핵심 로직] 위험도에 따른 차등 TTL 계산 메서드//redis갱신
      */
-    private Duration calculateDynamicTtl(String riskLevel) {
+    private Duration calculateDynamicTtl(RiskLevel riskLevel) {
         if (riskLevel == null) return Duration.ofDays(2); // 안전장치 (기본값)
 
-        return switch (riskLevel.toUpperCase()) {
-            case "SAFE" -> Duration.ofDays(1);              // 안전하면 3일마다 재검증
-            case "SUSPICIOUS", " DANGER" -> Duration.ofDays(3); // 위험/의심은 7일간 길게 유지
-            default -> Duration.ofDays(1);                  // 기타 상태는 하루
+        return switch (riskLevel) {
+            case SAFE -> Duration.ofDays(1);
+            case SUSPICIOUS, DANGER -> Duration.ofDays(3);
         };
     }
 
@@ -386,7 +391,7 @@ public class QrScanRedisService {
                     .schemeType(SchemeType.WEB) // 콜백으로 오는 건 사실상 모두 WEB이라고 가정
                     .analysisTime(responseDto.analysisTime())
                     .totalScore(responseDto.score() != null ? responseDto.score() : 0)
-                    .riskLevel(responseDto.riskLevel())
+                    .riskLevel(responseDto.riskLevel() != null ? responseDto.riskLevel().name() : "SUSPICIOUS")
 
                     // 1. HttpsInfo 빌드
                     .https(ScanHistory.HttpsInfo.builder()
@@ -454,6 +459,8 @@ public class QrScanRedisService {
             // ==========================================
             Duration dynamicTtl = calculateDynamicTtl(responseDto.riskLevel());
             cacheAnalysisResult(url, responseDto, dynamicTtl);
+            //  분석 완료 후 유저 개인의 Redis 히스토리 리스트에도 추가!
+            saveHistoryToRedis(guestUuid, responseDto);
 
             log.info("모든 저장 및 동적 캐싱 프로세스 완료");
             // 프론트엔드로 프로세스 완료 알림 진행...
@@ -483,9 +490,8 @@ public class QrScanRedisService {
         }
 
         // 파이프 연결이 끊기면 명부에서 삭제
-        emitter.onCompletion(() -> emitters.remove(guestUuid));
-        emitter.onTimeout(() -> emitters.remove(guestUuid));
-
+        emitter.onCompletion(() -> emitters.remove(guestUuid, emitter));
+        emitter.onTimeout(() -> emitters.remove(guestUuid, emitter));
 
         return emitter;
     }
