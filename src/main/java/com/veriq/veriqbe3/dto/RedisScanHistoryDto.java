@@ -33,7 +33,7 @@ public class RedisScanHistoryDto {
                 .typeInfo(mlResponse.originalUrl())
                 //.status(response.getStatus())
                 .scannedAt(LocalDateTime.now().format(FORMATTER))
-                .riskLevel(mlResponse.riskLevel())
+                .riskLevel(mlResponse.riskLevel() != null ? mlResponse.riskLevel().name() : "SUSPICIOUS")
                 .build();
     }
 }

@@ -2,9 +2,6 @@ package com.veriq.veriqbe3.controller;
 
 import com.veriq.veriqbe3.dto.AnalysisResponse;
 import com.veriq.veriqbe3.dto.ProgressRequest;
-import com.veriq.veriqbe3.dto.QrScanResponse;
-import com.veriq.veriqbe3.service.MlRequestService;
-import com.veriq.veriqbe3.service.ProcessQrScan;
 import com.veriq.veriqbe3.service.QrScanRedisService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -43,33 +40,38 @@ public class QrScanController {
 
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE) //multipart_form_data 제한
-    public ResponseEntity<QrScanResponse> uploadQrImage(    //반환 http body 타입 제한
-        @RequestHeader(value = "guest_uuid" ) String guestUuid,
-        @RequestParam("image") MultipartFile image) {
+    // 🚨 1. 반환 타입을 <QrScanResponse>에서 <?>로 변경합니다!
+    public ResponseEntity<?> uploadQrImage(
+            @RequestHeader(value = "guest_uuid" ) String guestUuid,
+            @RequestParam("image") MultipartFile image) {
         try {
-            QrScanResponse response = qrScanRedisService.processWithRedis(image, guestUuid);
-            return ResponseEntity.ok(response);
+            // 🚨 2. 서비스가 주는 결과물을 Object로 받습니다!
+            Object response = qrScanRedisService.processWithRedis(image, guestUuid);
 
+            // 🚨 3. 결과물이 어떤 타입인지(완성본인지, 로딩표인지)에 따라 응답을 다르게 줍니다!
+            if (response instanceof AnalysisResponse) {
+                // [Fast-Path] 캐시/DB에 있던 신선한 상세 데이터인 경우 (200 OK)
+                log.info("✅ 신선한 데이터 적중! 분석 결과를 즉시 반환합니다.");
+                return ResponseEntity.ok(response);
+            } else {
+                // [ML-Trigger] 파이썬 분석이 시작되어 진행 상태(QrScanResponse)를 받은 경우 (202 Accepted)
+                log.info("🔄 파이썬 서버로 분석을 지시했습니다. 프론트엔드에 대기 신호를 보냅니다.");
+                return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
+            }
 
-            //  프런트가 이상한 데이터를 보냈을 때 (사용자 잘못 -> 400)
-        } catch (IllegalArgumentException e) {
+            // --- 아래 예외 처리는 상민님 코드 그대로 유지 ---
+        } catch (IllegalArgumentException e) { // 사용자 잘못 -> 400
             log.warn("잘못된 QR 업로드 요청 - guestUuid: {}", guestUuid, e);
             return ResponseEntity.badRequest().build();
 
-//  파이썬 서버가 죽었거나, DB가 터졌을 때 (분석 서버 잘못 -> 502)
-        } catch (org.springframework.web.client.RestClientException e) {
+        } catch (org.springframework.web.client.RestClientException e) { // 파이썬 통신 에러 -> 502
             log.error("QR 스캔 요청 처리 중 서버(다운스트림) 에러 발생 - guestUuid: {}", guestUuid, e);
-            // 파이썬 서버 통신 실패 시 (502 반환)
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
-        }
-        /// 스프링 서버 내부에서 뭔가 터졌을 때 (스프링 서버잘못 -> 500)
-        catch (Exception e) {
+
+        } catch (Exception e) { // 스프링 서버 내부 에러 -> 500
             log.error("QR 스캔 요청 처리 중 서버 내부 에러 발생 - guestUuid: {}", guestUuid, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
-
-
-
     }
     //  스캔 내역 및 로딩화면 후 상세 보고서 API 엔드포인트 ,프런트랑 연결
     @GetMapping("/detail")

@@ -8,11 +8,12 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "scan_history",indexes={
-        @Index(name = "idx_final_url", columnList = "finalUrl"),
+        @Index(name = "idx_final_url", columnList = "redirect_final_url"),
         // 추가 스캔 보고서 제공시 url을 매게로 하기떄문에 idndexing에 추가,
         // URL과 스캔 시간을 분리해서 인덱스를 걸어줍니다.
-        @Index(name = "idx_original_url", columnList = "originalUrl"),
-        @Index(name = "idx_scanned_at", columnList = "scannedAt")
+        @Index(name = "idx_original_url", columnList = "original_url"),
+        @Index(name = "idx_scanned_at", columnList = "scanned_at"),
+        @Index(name = "idx_analysis_time", columnList = "analysis_time")
 })
 @Getter @Builder @NoArgsConstructor @AllArgsConstructor
 
@@ -30,16 +31,16 @@ public class ScanHistory {
 
     @Enumerated(EnumType.STRING)
     private SchemeType schemeType;
-
+//유재 스캔한 시간
     private LocalDateTime scannedAt;
 
     @PrePersist
     public void prePersist() {
         this.scannedAt = LocalDateTime.now();
     }
-
+//ML서버가 분석한 시간
     private LocalDateTime analysisTime;
-    private int totalScore;
+    private Integer totalScore;
     private String riskLevel;
 
     @Embedded private HttpsInfo https;
@@ -59,7 +60,7 @@ public class ScanHistory {
     @Embeddable @Getter @Builder @NoArgsConstructor @AllArgsConstructor
     public static class MlInfo {
         private String threats;
-        private int mlScore;
+        private Integer mlScore;
     }
 
     @Embeddable @Getter @Builder @NoArgsConstructor @AllArgsConstructor
@@ -79,7 +80,7 @@ public class ScanHistory {
     @Embeddable @Getter @Builder @NoArgsConstructor @AllArgsConstructor
     public static class RedirectInfo {
         private String finalUrl;
-        private int redirectCount;
+        private Integer redirectCount;
     }
 
     @Embeddable @Getter @Builder @NoArgsConstructor @AllArgsConstructor
