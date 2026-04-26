@@ -16,7 +16,7 @@ public record AnalysisResponse(
         InternalDbInfo internalDb,
         RedirectInfo redirect,
         ServerInfo serverInfo,
-        int score,
+        Integer score,
         String riskLevel
 ) {
     public record HttpsInfo(
@@ -29,7 +29,7 @@ public record AnalysisResponse(
 
     public record MlInfo(
             List<String> threats,
-            int score
+            Integer score
     ) {}
 
     public record ExternalApiInfo(
@@ -46,7 +46,7 @@ public record AnalysisResponse(
 
     public record RedirectInfo(
             String finalUrl,
-            int redirectCount
+            Integer redirectCount
     ) {}
 
     public record ServerInfo(
@@ -58,9 +58,12 @@ public record AnalysisResponse(
     public record CertificateInfo(
             boolean valid,
             String issuer,
-            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss[.SSSSSS][X]")
+            // 🚨 [여기가 핵심 수정 포인트!]
+            // 파이썬의 "Mar 10 00:00:00 2026 GMT" 형식을 읽기 위한 포맷입니다.
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "MMM dd HH:mm:ss yyyy z", locale = "en",timezone = "GMT")
             LocalDateTime validFrom,
-            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss[.SSSSSS][X]")
+
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "MMM dd HH:mm:ss yyyy z", locale = "en",timezone = "GMT")
             LocalDateTime validTo
     ) {}
 }

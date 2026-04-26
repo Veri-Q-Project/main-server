@@ -385,7 +385,7 @@ public class QrScanRedisService {
                     .typeInfo(url) // 보통 원본 URL을 넣습니다
                     .schemeType(SchemeType.WEB) // 콜백으로 오는 건 사실상 모두 WEB이라고 가정
                     .analysisTime(responseDto.analysisTime())
-                    .totalScore(responseDto.score())
+                    .totalScore(responseDto.score() != null ? responseDto.score() : 0)
                     .riskLevel(responseDto.riskLevel())
 
                     // 1. HttpsInfo 빌드
@@ -402,7 +402,8 @@ public class QrScanRedisService {
                     .ml(ScanHistory.MlInfo.builder()
                             .threats(responseDto.ml() != null && responseDto.ml().threats() != null
                                     ? String.join(", ", responseDto.ml().threats()) : null)
-                            .mlScore(responseDto.ml() != null ? responseDto.ml().score() : 0)
+                            // 🚨 2. mlScore 방어 (null이 아닐 때만 값을 넣고, null이면 0)
+                            .mlScore(responseDto.ml() != null && responseDto.ml().score() != null ? responseDto.ml().score() : 0)
                             .build())
 
                     // 4. ExternalApiInfo 빌드
@@ -423,7 +424,8 @@ public class QrScanRedisService {
                     // 6. RedirectInfo 빌드
                     .redirect(ScanHistory.RedirectInfo.builder()
                             .finalUrl(responseDto.redirect() != null ? responseDto.redirect().finalUrl() : url)
-                            .redirectCount(responseDto.redirect() != null ? responseDto.redirect().redirectCount() : 0)
+                            // 🚨 3. redirectCount 방어 (null이 아닐 때만 값을 넣고, null이면 0)
+                            .redirectCount(responseDto.redirect() != null && responseDto.redirect().redirectCount() != null ? responseDto.redirect().redirectCount() : 0)
                             .build())
 
                     // 7. ServerInfo 및 CertificateInfo
