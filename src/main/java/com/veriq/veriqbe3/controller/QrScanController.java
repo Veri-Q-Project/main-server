@@ -2,8 +2,10 @@ package com.veriq.veriqbe3.controller;
 
 import com.veriq.veriqbe3.dto.AnalysisResponse;
 import com.veriq.veriqbe3.dto.ProgressRequest;
+import com.veriq.veriqbe3.dto.RedisScanHistoryDto;
 import com.veriq.veriqbe3.service.QrScanRedisService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -15,6 +17,11 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.beans.factory.annotation.Value;
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -35,12 +42,35 @@ public class QrScanController {
     private final RedisTemplate<String, Object> redisTemplate;
     @Value("${ML_SECRET_KEY}")
     private String mlServerSecret;
-
-
-
-
+    @Operation(
+            summary = "QR 코드 업로드 및 분석 시작",
+            description = """
+        ###  로딩 UI 및 SSE 연결 가이드
+        
+        이 API의 응답 결과(`status`)에 따라 프론트엔드 흐름을 제어해야 합니다.
+        
+        **1. 공통 사항**
+        - 응답을 받으면 즉시 "QR 코드 디코딩이 완료되었습니다" 메시지와 함께 로딩 UI를 준비합니다.
+        
+        **2. 상태(`status`)별 분기 처리**
+        
+        - 🟢 **`status == "COMPLETED"` (기존 데이터 존재 또는 비 URL)**
+            - **SSE 연결을 하지 마세요.**
+            - **`isUrl == false`**: 비 URL 전용 로딩창을 띄우고 빠르게 로딩창을 순차 진행(스킵 타입 반영) 후 완료 처리합니다.
+            - **`isUrl == true`**: 기존 DB/캐시 적중 사례입니다. URL 전용 로딩창을 빠르게 실행하고, 응답에 포함된 `originalUrl`을 사용하여 `/detail` API를 즉시 호출합니다.
+        
+        - 🟡 **`status == "PROCESSING"` (신규 분석 필요)**
+            - **반드시 `/subscribe` 엔드포인트로 SSE 파이프를 연결해야 합니다.**
+            - SSE로 전달되는 `step`, `status` 정보를 실시간으로 로딩 UI에 바인딩하세요.
+            
+        **3. 스킴 타입(`schemeType`) 처리**
+        - `PROCESSING` 상태일 때는 값이 들어와도 **무시**합니다.
+        - `COMPLETED` 상태가 되었을 때:
+            - `isUrl == true`이면 **무시**합니다.
+            - `isUrl == false`이면 해당 값(예: `tel`, `smsto`)을 UI에 **반영**합니다.
+        """
+    )
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE) //multipart_form_data 제한
-    // 🚨 1. 반환 타입을 <QrScanResponse>에서 <?>로 변경합니다!
     public ResponseEntity<?> uploadQrImage(
             @RequestHeader(value = "guest_uuid" ) String guestUuid,
             @RequestParam("image") MultipartFile image) {
@@ -74,6 +104,17 @@ public class QrScanController {
         }
     }
     //  스캔 내역 및 로딩화면 후 상세 보고서 API 엔드포인트 ,프런트랑 연결
+    @Operation(
+            summary = "분석 결과 상세 조회",
+            description = """
+    ### 호출 시점:
+    SSE의 `COMPLETE` 이벤트를 수신한 직후 호출합니다.
+    
+    ### 요청 방법:
+    - **URL 파라미터**: `COMPLETE` 이벤트 메시지에 포함된 `originalUrl`을 `url` 쿼리 파라미터로 전달합니다.
+    - **헤더**: 요청 시 `guest_uuid`를 반드시 포함해야 합니다.
+    """
+    )
     @GetMapping("/detail")
     public ResponseEntity<AnalysisResponse> getUrlDetail(@RequestParam("url") String url) {
         try {
@@ -235,6 +276,18 @@ public class QrScanController {
 
     // 프론트엔드가 파이프를 꽂으러 오는 곳
     @CrossOrigin(origins = "${frontend.url}")//프론트의 주소에 따라 유동, 해당 주소만 파이프 받아들임
+    @Operation(
+            summary = "실시간 분석 상태 구독 (SSE)",
+            description = """
+    ###  주의사항: 분석 요청(Upload) 전 반드시 이 파이프라인이 먼저 연결되어야 합니다.
+    연결되지 않은 상태에서 분석 요청 시, 중간 과정을 수신할 수 없습니다.
+    
+    **수신 이벤트 채널 안내:**
+    - `INIT`: SSE 연결 성공 시 전송
+    - `progress`: 분석 단계별 상태 전송 (Step, Status 포함)
+    - `COMPLETE`: 분석 최종 완료 시 전송 (**이벤트 데이터에 포함된 URL로 상세조회 수행**)
+    """
+    )
     @GetMapping(value = "/subscribe", produces = "text/event-stream;charset=UTF-8")
     public ResponseEntity<SseEmitter> subscribe(@RequestParam("guest_uuid") String guestUuid) {
 
@@ -250,7 +303,18 @@ public class QrScanController {
         }
     }
     //스캔 리스트 제공 api(프런트)
+    @Operation(summary = "스캔 리스트 제공 API", description = "사용자의 최근 QR 스캔 이력을 반환합니다.")
     @GetMapping("/history")
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "성공적으로 이력을 조회함",
+                    content = @Content(
+                            mediaType = "application/json",
+                            array = @ArraySchema(schema = @Schema(implementation = RedisScanHistoryDto.class))
+                    )
+            )
+    })
     public ResponseEntity<List<Object>> getScanHistory
     (
             @RequestHeader(value = "guest_uuid", required = true) String guestUuid) {
