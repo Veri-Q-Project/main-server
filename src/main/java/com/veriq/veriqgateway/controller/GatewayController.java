@@ -115,9 +115,8 @@ public class GatewayController {
                           "guestUuid": "sangmin-uuid-123",
                           "status": "COMPLETED",
                           "isUrl": true,
-                          "message": "기존 분석 결과가 존재합니다. 바로 /detail을 호출하세요.",
-                          "typeInfo": "https://naver-login-check.xyz",
-                          "schemeType": "URL"
+                          "schemeType": "URL",
+                          "typeInfo": "https://naver-login-check.xyz"
                         }
                         """
                                     ),
@@ -129,9 +128,8 @@ public class GatewayController {
                           "guestUuid": "sangmin-uuid-123",
                           "status": "COMPLETED",
                           "isUrl": false,
-                          "message": "비 URL QR 코드입니다. schemeType을 UI에 반영하세요.",
-                          "typeInfo": "010-1234-5678",
-                          "schemeType": "TEL"
+                          "schemeType": "TEL",
+                          "typeInfo": "010-1234-5678"
                         }
                         """
                                     )
@@ -150,15 +148,29 @@ public class GatewayController {
                       "guestUuid": "sangmin-uuid-123",
                       "status": "PROCESSING",
                       "isUrl": true,
-                      "message": "분석을 시작합니다. 즉시 /subscribe SSE를 연결하세요.",
-                      "typeInfo": "https://unknown-qr-link.com",
-                      "schemeType": null
+                      "schemeType": null,
+                      "typeInfo": "https://unknown-qr-link.com"
                     }
                     """
                             )
                     )
             ),
-            @ApiResponse(responseCode = "429", description = "캡차 인증 필요")
+            // 🚨 429 에러일 때도 스키마 형태를 맞춰줍니다.
+            @ApiResponse(responseCode = "429", description = "캡차 인증 필요",
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    value = """
+                    {
+                      "guestUuid": "sangmin-uuid-123",
+                      "status": "REJECTED",
+                      "isUrl": null,
+                      "schemeType": null,
+                      "typeInfo": "REQUIRE_CAPTCHA"
+                    }
+                    """
+                            )
+                    )
+            )
     })
     @PostMapping(value = "/scan", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> processScan(
@@ -174,8 +186,6 @@ public class GatewayController {
                     .body(ScanResponse.builder()
                             .guestUuid(guestUuid)
                             .status("REJECTED")
-                            .error_code("REQUIRE_CAPTCHA")
-                            .message("요청 횟수 초과. 안전한 이용을 위해 캡차 인증이 필요합니다.")
                             .build());
         }
 
@@ -221,7 +231,6 @@ public class GatewayController {
             ScanResponse finalResponse = ScanResponse.builder()
                     .guestUuid(be3Data.getGuestUuid())
                     .status(be3Data.getStatus())
-                    .message(be3Data.getMessage())
                     .isUrl(be3Data.getIsUrl())
                     .schemeType(be3Data.getSchemeType() != null ? be3Data.getSchemeType().name() : null)
                     .typeInfo(be3Data.getTypeInfo())
@@ -244,7 +253,6 @@ public class GatewayController {
                     .body(ScanResponse.builder()
                             .guestUuid(guestUuid)
                             .status("ERROR")
-                            .message("게이트웨이 통신 중 알 수 없는 오류 발생")
                             .build());
         }
     }
@@ -273,7 +281,6 @@ public class GatewayController {
                     .body(ScanResponse.builder()
                             .guestUuid(currentUuid)
                             .status("REJECTED")
-                            .message("캡차 검증에 실패했습니다. 다시 시도해 주세요.")
                             .build());
         }
 
@@ -284,6 +291,5 @@ public class GatewayController {
         return ResponseEntity.ok(ScanResponse.builder()
                 .guestUuid(currentUuid)
                 .status("SUCCESS")
-                .message("캡차 인증 성공! 이제 다시 스캔을 이용하실 수 있습니다.")
                 .build());}
 }
