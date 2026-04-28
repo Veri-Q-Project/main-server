@@ -24,9 +24,8 @@ public class ScanResponse {
     @Schema(description = "URL 여부 확인", example = "true")
     private Boolean isUrl;
 
-    // 🚨 핵심 포인트: allowableValues를 통해 Enum 종류를 명시합니다.
-    @Schema(description = "URL 스키마 타입", example = "URL",
-            allowableValues = {"URL", "TEL", "SMSTO", "MAILTO", "GEO", "MARKET", "OTHER"})
+    @Schema(description = "URL 스키마 타입", example = "WEB",
+            allowableValues = {"WEB", "SHORT_URL", "OTP", "CRYPTO", "SMS", "WIFI", "CONTACT", "DEEP_LINK", "TEL", "EMAIL", "APP_STORE", "OTHER"})
     private String schemeType;
 
     @Schema(description = "원본 URL 정보 또는 텍스트 데이터", example = "https://naver-login-check.xyz")
