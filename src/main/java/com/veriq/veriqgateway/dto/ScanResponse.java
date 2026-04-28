@@ -1,6 +1,7 @@
 package com.veriq.veriqgateway.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 
@@ -9,6 +10,7 @@ import lombok.*;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonPropertyOrder({"guestUuid", "status", "isUrl", "schemeType", "typeInfo"})
 @Schema(description = "QR 스캔 최종 결과 응답 객체")
 public class ScanResponse {
 
