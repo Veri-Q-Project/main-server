@@ -1,5 +1,5 @@
 package com.veriq.veriqgateway.dto;
-import com.veriq.veriqbe3.domain.SchemeType;
+import com.veriq.veriqgateway.domain.SchemeType;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 @Getter
