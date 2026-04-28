@@ -1,5 +1,5 @@
 package com.veriq.veriqgateway.controller;
-import com.veriq.veriqbe3.dto.QrScanResponse;
+import com.veriq.veriqgateway.dto.QrScanResponse;
 import com.veriq.veriqgateway.dto.ScanResponse;
 import com.veriq.veriqgateway.service.SecurityService;
 import io.swagger.v3.oas.annotations.Operation;
