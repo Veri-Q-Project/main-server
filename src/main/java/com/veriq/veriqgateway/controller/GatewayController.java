@@ -2,6 +2,7 @@ package com.veriq.veriqgateway.controller;
 import com.veriq.veriqbe3.dto.QrScanResponse;
 import com.veriq.veriqgateway.dto.ScanResponse;
 import com.veriq.veriqgateway.service.SecurityService;
+import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
@@ -15,7 +16,17 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import com.veriq.veriqgateway.dto.CaptchaRequest;
 import org.springframework.beans.factory.annotation.Value;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+
 import java.util.UUID;
+@Tag(name = "Gateway API", description = "보안 검사 및 분석 요청 위임 컨트롤러")
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
@@ -61,6 +72,34 @@ public class GatewayController {
         // 헤더에 정보가 없으면 마지막 수단으로 직접 접속 IP 반환
         return request.getRemoteAddr();
     }
+    @Operation(
+            summary = "QR 코드 업로드 및 분석 시작",
+            description = """
+            ### 🚨 로딩 UI 및 SSE 연결 가이드
+            
+            이 API의 응답 결과(`status`)에 따라 프론트엔드 흐름을 제어해야 합니다.
+            
+            **1. 공통 사항**
+            - 응답을 받으면 즉시 "QR 코드 디코딩이 완료되었습니다" 메시지와 함께 로딩 UI를 준비합니다.
+            
+            **2. 상태(`status`)별 분기 처리**
+            
+            - 🟢 **`status == "COMPLETED"` (기존 데이터 존재 또는 비 URL)**
+              - **SSE 연결을 하지 마세요.**
+              - `isUrl == false`: 비 URL 전용 로딩창을 띄우고 빠르게 순차 진행(스킵 타입 반영) 후 완료 처리합니다.
+              - `isUrl == true`: 기존 DB/캐시 적중 사례입니다. URL 전용 로딩창을 빠르게 실행하고, 응답에 포함된 `originalUrl`을 사용하여 `/detail` API를 즉시 호출합니다.
+            
+            - 🟡 **`status == "PROCESSING"` (신규 분석 필요)**
+              - **반드시 `/subscribe` 엔드포인트로 SSE 파이프를 연결해야 합니다.**
+              - SSE로 전달되는 `step`, `status` 정보를 실시간으로 로딩 UI에 바인딩하세요.
+            
+            **3. 스킴 타입(`schemeType`) 처리**
+            - `PROCESSING` 상태일 때는 값이 들어와도 **무시**합니다.
+            - `COMPLETED` 상태가 되었을 때:
+              - `isUrl == true`이면 **무시**합니다.
+              - `isUrl == false`이면 해당 값(예: `tel`, `smsto`)을 UI에 **반영**합니다.
+            """
+    )
     @PostMapping(value = "/scan", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> processScan(
             @RequestHeader("guest_uuid") String guestUuid,
@@ -154,7 +193,14 @@ public class GatewayController {
      * [POST] /api/v1/auth/captcha/verify
      * 캡차 성공 시 해당 사용자의 Redis 제한 카운트를 초기화합니다.
      */
-
+    @Operation(
+            summary = "구글 reCAPTCHA 검증 및 제한 초기화",
+            description = "프론트엔드에서 획득한 캡차 토큰을 검증합니다. 성공 시 해당 IP의 Redis 카운트가 초기화되어 다시 스캔이 가능해집니다."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "캡차 인증 성공. 이제 다시 /scan API를 호출할 수 있습니다."),
+            @ApiResponse(responseCode = "400", description = "캡차 인증 실패. 토큰이 만료되었거나 봇으로 판명되었습니다.")
+    })
     @PostMapping("/auth/captcha/verify")
     public ResponseEntity<ScanResponse> verifyCaptcha(
             @RequestBody CaptchaRequest captchaReq,
