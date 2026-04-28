@@ -3,6 +3,7 @@ import com.veriq.veriqgateway.dto.QrScanResponse;
 import com.veriq.veriqgateway.dto.ScanResponse;
 import com.veriq.veriqgateway.service.SecurityService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
@@ -101,13 +102,63 @@ public class GatewayController {
             """
     )
     @ApiResponses(value = {
-            // 🚨 핵심: implementation에 ScanResponse.class를 넣어주면 하얀 빈 칸이 사라집니다!
-            @ApiResponse(responseCode = "200", description = "기존 분석 결과 즉시 반환 (Success)",
-                    content = @Content(schema = @Schema(implementation = ScanResponse.class))),
-            @ApiResponse(responseCode = "202", description = "신규 분석 프로세스 시작 (Accepted)",
-                    content = @Content(schema = @Schema(implementation = ScanResponse.class))),
-            @ApiResponse(responseCode = "429", description = "보안 정책에 의한 요청 차단 (Captcha Required)",
-                    content = @Content(schema = @Schema(implementation = ScanResponse.class)))
+            // --- 1 & 2. COMPLETED 케이스 (기존 데이터 존재 또는 비 URL) ---
+            @ApiResponse(responseCode = "200", description = "기존 분석 결과 즉시 반환 (SSE 연결 불필요)",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ScanResponse.class),
+                            examples = {
+                                    @ExampleObject(
+                                            name = "1. COMPLETED (URL 타입)",
+                                            summary = "기존 URL 분석 결과가 있는 경우",
+                                            value = """
+                        {
+                          "guestUuid": "sangmin-uuid-123",
+                          "status": "COMPLETED",
+                          "isUrl": true,
+                          "message": "기존 분석 결과가 존재합니다. 바로 /detail을 호출하세요.",
+                          "typeInfo": "https://naver-login-check.xyz",
+                          "schemeType": "URL"
+                        }
+                        """
+                                    ),
+                                    @ExampleObject(
+                                            name = "2. COMPLETED (비 URL 타입)",
+                                            summary = "텍스트, 전화번호 등 비 URL QR인 경우",
+                                            value = """
+                        {
+                          "guestUuid": "sangmin-uuid-123",
+                          "status": "COMPLETED",
+                          "isUrl": false,
+                          "message": "비 URL QR 코드입니다. schemeType을 UI에 반영하세요.",
+                          "typeInfo": "010-1234-5678",
+                          "schemeType": "TEL"
+                        }
+                        """
+                                    )
+                            }
+                    )
+            ),
+            // --- 3. PROCESSING 케이스 (신규 분석 필요) ---
+            @ApiResponse(responseCode = "202", description = "신규 분석 프로세스 시작 (SSE 연결 필수)",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ScanResponse.class),
+                            examples = @ExampleObject(
+                                    name = "3. PROCESSING (신규 분석)",
+                                    summary = "처음 분석하는 QR인 경우",
+                                    value = """
+                    {
+                      "guestUuid": "sangmin-uuid-123",
+                      "status": "PROCESSING",
+                      "isUrl": true,
+                      "message": "분석을 시작합니다. 즉시 /subscribe SSE를 연결하세요.",
+                      "typeInfo": "https://unknown-qr-link.com",
+                      "schemeType": null
+                    }
+                    """
+                            )
+                    )
+            ),
+            @ApiResponse(responseCode = "429", description = "캡차 인증 필요")
     })
     @PostMapping(value = "/scan", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> processScan(
@@ -206,10 +257,6 @@ public class GatewayController {
             summary = "구글 reCAPTCHA 검증 및 제한 초기화",
             description = "프론트엔드에서 획득한 캡차 토큰을 검증합니다. 성공 시 해당 IP의 Redis 카운트가 초기화되어 다시 스캔이 가능해집니다."
     )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "캡차 인증 성공. 이제 다시 /scan API를 호출할 수 있습니다."),
-            @ApiResponse(responseCode = "400", description = "캡차 인증 실패. 토큰이 만료되었거나 봇으로 판명되었습니다.")
-    })
     @PostMapping("/auth/captcha/verify")
     public ResponseEntity<ScanResponse> verifyCaptcha(
             @RequestBody CaptchaRequest captchaReq,
