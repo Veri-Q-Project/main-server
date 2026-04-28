@@ -100,6 +100,15 @@ public class GatewayController {
               - `isUrl == false`이면 해당 값(예: `tel`, `smsto`)을 UI에 **반영**합니다.
             """
     )
+    @ApiResponses(value = {
+            // 🚨 핵심: implementation에 ScanResponse.class를 넣어주면 하얀 빈 칸이 사라집니다!
+            @ApiResponse(responseCode = "200", description = "기존 분석 결과 즉시 반환 (Success)",
+                    content = @Content(schema = @Schema(implementation = ScanResponse.class))),
+            @ApiResponse(responseCode = "202", description = "신규 분석 프로세스 시작 (Accepted)",
+                    content = @Content(schema = @Schema(implementation = ScanResponse.class))),
+            @ApiResponse(responseCode = "429", description = "보안 정책에 의한 요청 차단 (Captcha Required)",
+                    content = @Content(schema = @Schema(implementation = ScanResponse.class)))
+    })
     @PostMapping(value = "/scan", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> processScan(
             @RequestHeader("guest_uuid") String guestUuid,
