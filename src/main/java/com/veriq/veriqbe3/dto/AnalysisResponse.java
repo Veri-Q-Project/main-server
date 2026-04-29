@@ -11,6 +11,7 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record AnalysisResponse(
         String analysisTime,
+        @JsonAlias({"original_url", "url", "originalUrl"})
         String originalUrl,
         HttpsInfo https,
         ShortUrlInfo shortUrl,
