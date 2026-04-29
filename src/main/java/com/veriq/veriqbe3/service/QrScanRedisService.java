@@ -274,16 +274,30 @@ public class QrScanRedisService {
 
         try {
             String rawDate = history.getAnalysisTime().replaceAll("\\s{2,}", " ");
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMM d HH:mm:ss yyyy z", Locale.ENGLISH);
+            LocalDateTime analysisDateTime;
 
-            // 🚨 LocalDateTime 대신 ZonedDateTime 사용 (GMT 시간대까지 완벽하게 소화)
-            ZonedDateTime analysisDateTime = ZonedDateTime.parse(rawDate, formatter);
+            // 🚨 1. 파이썬이 새롭게 보내는 "2026-04-29T12:56:45" (ISO 포맷) 처리
+            if (rawDate.contains("T")) {
+                // 뒤에 Z나 GMT 같은 타임존 정보가 붙어있을 경우를 대비해 가장 안전하게 파싱
+                if (rawDate.endsWith("Z")) {
+                    analysisDateTime = ZonedDateTime.parse(rawDate).toLocalDateTime();
+                } else {
+                    // 순수 "2026-04-29T12:56:45" 형태일 때
+                    analysisDateTime = LocalDateTime.parse(rawDate);
+                }
+            }
+            // 🚨 2. 기존에 저장되어 있던 과거 데이터 ("Apr 29 12:56:45 2026 GMT") 호환성 유지
+            else {
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMM d HH:mm:ss yyyy z", Locale.ENGLISH);
+                analysisDateTime = ZonedDateTime.parse(rawDate, formatter).toLocalDateTime();
+            }
 
-            // 🚨 현재 시간도 ZonedDateTime.now()로 맞춰서 비교
-            long daysPassed = java.time.Duration.between(analysisDateTime, ZonedDateTime.now()).toDays();
+            // 현재 시간과 비교하여 며칠이 지났는지 계산
+            long daysPassed = java.time.Duration.between(analysisDateTime, LocalDateTime.now()).toDays();
             long threshold = "SAFE".equalsIgnoreCase(history.getRiskLevel()) ? 1 : 3;
 
             return daysPassed >= threshold;
+
         } catch (Exception e) {
             log.warn("날짜 파싱 실패로 재분석 유도: {}", history.getAnalysisTime());
             return true;
