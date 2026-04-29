@@ -33,7 +33,7 @@ public class MlRequestService {
 
             // 2. 바디 세팅 (파이썬 서버가 요구하는 JSON 규격에 맞춤) 원본 url들어감
             Map<String, String> body = new HashMap<>();
-            body.put("original_url", url);//url:"https://naver.com" 이 json형태로 들어감
+            body.put("url", url);//url:"https://naver.com" 이 json형태로 들어감
             body.put("guestUuid", guestUuid);
             // 3. 엔티티 조립 바디랑 헤더 조립
             HttpEntity<Map<String, String>> requestEntity = new HttpEntity<>(body, headers);
