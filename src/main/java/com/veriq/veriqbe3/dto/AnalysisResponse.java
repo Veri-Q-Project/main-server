@@ -1,37 +1,62 @@
 package com.veriq.veriqbe3.dto;
+
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import io.swagger.v3.oas.annotations.media.Schema;
-import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.veriq.veriqbe3.domain.RiskLevel;
 
-import java.time.LocalDateTime;
 import java.util.List;
+
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record AnalysisResponse(
         String analysisTime,
-        @JsonProperty("originalUrl")
-        @JsonAlias({"original_url", "url"})
         String originalUrl,
         HttpsInfo https,
         ShortUrlInfo shortUrl,
         MlInfo ml,
-        @JsonAlias({"externalApi", "safe_browsing"})
         ExternalApiInfo externalApi,
-        @JsonProperty("report_count")
         Integer reportCount,
-        @JsonProperty("block_count")
         Integer blockCount,
-        @JsonProperty("domain_age")
         String domainAge,
-
-
         RedirectInfo redirect,
         ServerInfo serverInfo,
         Integer score,
         RiskLevel riskLevel
 ) {
+    // 🚨 [무식하지만 100% 확실한 방법] Jackson 멱살 잡고 매핑 강제 지시
+    @JsonCreator
+    public AnalysisResponse(
+            @JsonProperty("analysisTime") @JsonAlias({"analysis_time"}) String analysisTime,
+            @JsonProperty("originalUrl") @JsonAlias({"original_url", "url"}) String originalUrl,
+            @JsonProperty("https") HttpsInfo https,
+            @JsonProperty("shortUrl") ShortUrlInfo shortUrl,
+            @JsonProperty("ml") MlInfo ml,
+            @JsonProperty("externalApi") @JsonAlias({"safe_browsing"}) ExternalApiInfo externalApi,
+            @JsonProperty("report_count") Integer reportCount,
+            @JsonProperty("block_count") Integer blockCount,
+            @JsonProperty("domain_age") String domainAge,
+            @JsonProperty("redirect") RedirectInfo redirect,
+            @JsonProperty("serverInfo") ServerInfo serverInfo,
+            @JsonProperty("score") Integer score,
+            @JsonProperty("riskLevel") RiskLevel riskLevel
+    ) {
+        this.analysisTime = analysisTime;
+        this.originalUrl = originalUrl;
+        this.https = https;
+        this.shortUrl = shortUrl;
+        this.ml = ml;
+        this.externalApi = externalApi;
+        this.reportCount = reportCount;
+        this.blockCount = blockCount;
+        this.domainAge = domainAge;
+        this.redirect = redirect;
+        this.serverInfo = serverInfo;
+        this.score = score;
+        this.riskLevel = riskLevel;
+    }
+
     public record HttpsInfo(
             boolean isSecure
     ) {}
@@ -42,7 +67,6 @@ public record AnalysisResponse(
 
     public record MlInfo(
             @Schema(
-                    // 1. description에 카테고리별로 예쁘게 정리해서 넣어줍니다.
                     description = "###  탐지 위협 카테고리 상세\n" +
                             "**1. 리다이렉트 관련**\n" +
                             "- `too_many_redirects`, `loop_detected`, `invalid_location`\n\n" +
@@ -52,8 +76,6 @@ public record AnalysisResponse(
                             "- `MALWARE`, `SOCIAL_ENGINEERING`, `UNWANTED_SOFTWARE`, `POTENTIALLY_HARMFUL_APPLICATION`\n\n" +
                             "**4. 기타 탐지**\n" +
                             "- `suspicious_param_detected`, `suspicious_keyword_detected`",
-
-                    // 2. 실제 값 리스트는 가흔님 가이드대로 플래그들만 나열합니다.
                     allowableValues = {
                             "too_many_redirects", "loop_detected", "invalid_location",
                             "shortened_url", "embedded_url", "percent_encoding_detected", "double_encoding_suspected",
@@ -70,10 +92,8 @@ public record AnalysisResponse(
     public record ExternalApiInfo(
             boolean checked,
             String provider,
-            String result // 실패/결과 없을 시 null 대응을 위해 String 유지
+            String result
     ) {}
-
-
 
     public record RedirectInfo(
             String finalUrl,
@@ -89,8 +109,6 @@ public record AnalysisResponse(
     public record CertificateInfo(
             boolean valid,
             String issuer,
-            // 🚨 [여기가 핵심 수정 포인트!]
-            // 파이썬의 "Mar 10 00:00:00 2026 GMT" 형식을 읽기 위한 포맷입니다.
             String validFrom,
             String validTo
     ) {}
