@@ -1,5 +1,6 @@
 package com.veriq.veriqbe3.dto;
 import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -14,8 +15,16 @@ public record AnalysisResponse(
         HttpsInfo https,
         ShortUrlInfo shortUrl,
         MlInfo ml,
+        @JsonAlias({"externalApi", "safe_browsing"})
         ExternalApiInfo externalApi,
-        InternalDbInfo internalDb,
+        @JsonProperty("report_count")
+        Integer reportCount,
+        @JsonProperty("block_count")
+        Integer blockCount,
+        @JsonProperty("domain_age")
+        String domainAge,
+
+
         RedirectInfo redirect,
         ServerInfo serverInfo,
         Integer score,
@@ -62,11 +71,7 @@ public record AnalysisResponse(
             String result // 실패/결과 없을 시 null 대응을 위해 String 유지
     ) {}
 
-    public record InternalDbInfo(
-            boolean exists,
-            Integer reportCount, // null 대응을 위해 래퍼 클래스 Integer 사용
-            Integer blockCount
-    ) {}
+
 
     public record RedirectInfo(
             String finalUrl,

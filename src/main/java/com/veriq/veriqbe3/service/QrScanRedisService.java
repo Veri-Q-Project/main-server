@@ -187,9 +187,10 @@ public class QrScanRedisService {
 
                     // 5. InternalDbInfo
                     .internalDb(ScanHistory.InternalDbInfo.builder()
-                            .dbExists(responseDto.internalDb() != null && responseDto.internalDb().exists())
-                            .dbReportCount(responseDto.internalDb() != null && responseDto.internalDb().reportCount() != null ? responseDto.internalDb().reportCount() : 0)
-                            .dbBlockCount(responseDto.internalDb() != null && responseDto.internalDb().blockCount() != null ? responseDto.internalDb().blockCount() : 0)
+                            // 🚨 껍데기 없이 직접 호출! exists는 신고 건수가 1 이상일 때 true로 판단
+                            .dbExists(responseDto.reportCount() != null && responseDto.reportCount() > 0)
+                            .dbReportCount(responseDto.reportCount())
+                            .dbBlockCount(responseDto.blockCount())
                             .build())
 
                     // 6. RedirectInfo (null 방어)
@@ -396,11 +397,11 @@ public class QrScanRedisService {
                         entity.getExternalApi().getApiProvider(),
                         entity.getExternalApi().getApiResult()
                 ) : null,
-                entity.getInternalDb() != null ? new AnalysisResponse.InternalDbInfo(
-                        entity.getInternalDb().isDbExists(),
-                        entity.getInternalDb().getDbReportCount(),
-                        entity.getInternalDb().getDbBlockCount()
-                ) : null,
+                // ✅ 새로 들어갈 3줄 (reportCount, blockCount, domainAge)
+                entity.getInternalDb() != null ? entity.getInternalDb().getDbReportCount() : null,
+                entity.getInternalDb() != null ? entity.getInternalDb().getDbBlockCount() : null,
+                null, // domainAge는 아직 DB에 없으므로 null 처리
+                // ✅
                 entity.getRedirect() != null ? new AnalysisResponse.RedirectInfo(
                         entity.getRedirect().getFinalUrl(),
                         entity.getRedirect().getRedirectCount()
@@ -479,9 +480,9 @@ public class QrScanRedisService {
 
                     // 5. InternalDbInfo 빌드
                     .internalDb(ScanHistory.InternalDbInfo.builder()
-                            .dbExists(responseDto.internalDb() != null && responseDto.internalDb().exists())
-                            .dbReportCount(responseDto.internalDb() != null && responseDto.internalDb().reportCount() != null ? responseDto.internalDb().reportCount() : 0)
-                            .dbBlockCount(responseDto.internalDb() != null && responseDto.internalDb().blockCount() != null ? responseDto.internalDb().blockCount() : 0)
+                            .dbExists(responseDto.reportCount() != null && responseDto.reportCount() > 0)
+                            .dbReportCount(responseDto.reportCount())
+                            .dbBlockCount(responseDto.blockCount())
                             .build())
 
 
