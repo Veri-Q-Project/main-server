@@ -21,11 +21,14 @@ public enum RiskLevel {
 
     @JsonCreator // JSON의 문자열을 Enum으로 매핑할 때 사용함
     public static RiskLevel from(String value) {
+        if (value == null || value.isBlank()) return RiskLevel.SUSPICIOUS; // null 방어
+
         for (RiskLevel level : RiskLevel.values()) {
-            if (level.value.equalsIgnoreCase(value)) {
+            if (level.value.equalsIgnoreCase(value) || level.name().equalsIgnoreCase(value)) {
                 return level;
             }
         }
-        return null; // 혹은 기본값 설정
+        // 매칭되는 게 없을 때 null 대신 의심(SUSPICIOUS) 상태로 기본값 설정
+        return RiskLevel.SUSPICIOUS;
     }
 }
