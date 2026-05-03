@@ -79,6 +79,7 @@ public class QrScanRedisService {
                     .status("COMPLETED")
                     .isUrl(false)
                     .message(decodingMsg)
+                    .schemeType(result.type() != null ? result.type() : SchemeType.OTHER)
                     .build();
         }
 
