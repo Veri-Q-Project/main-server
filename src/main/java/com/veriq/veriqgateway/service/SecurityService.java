@@ -19,7 +19,7 @@ public class SecurityService {
     private final StringRedisTemplate redisTemplate;
 
     // 사용자(Guest)에게 허용할 최대 스캔 횟수
-    private static final int LIMIT = 10;
+    private static final int LIMIT = 50;
     private final RestTemplate restTemplate; // 메인 클래스에서 등록한 빈 사용
     @Value("${GOOGLE_RECAPTCHA_SECRET_KEY}")
     private String secretKey;
