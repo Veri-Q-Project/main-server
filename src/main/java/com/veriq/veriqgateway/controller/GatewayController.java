@@ -186,6 +186,7 @@ public class GatewayController {
                     .body(ScanResponse.builder()
                             .guestUuid(guestUuid)
                             .status("REJECTED")
+                            .typeInfo("REQUIRE_CAPTCHA")
                             .build());
         }
 
