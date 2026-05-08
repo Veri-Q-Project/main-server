@@ -88,5 +88,7 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       BE3_CALLBACK_FINAL_URL: "http://veriq-be3:8083/api/v1/scan/callback"
       BE3_CALLBACK_PROGRESS_URL: "http://veriq-be3:8083/api/v1/scan/callback/progress"
+      OTX_API_KEY: ${OTX_API_KEY}
+      GOOGLE_SAFE_BROWSING_API_KEY: ${GOOGLE_SAFE_BROWSING_API_KEY}
     depends_on:
       - veriq-db
