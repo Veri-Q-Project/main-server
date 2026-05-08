@@ -247,7 +247,7 @@ public class QrScanRedisService {
         }
         //  Redis에 없으면 DB에서 조회
         //스캔한 내역중 최신 내역을 db에서 뽑아옴
-        Optional<ScanHistory> dbHistory = scanHistoryRepository.findFirstByOriginalUrlOrderByScannedAtDesc(url);
+        Optional<ScanHistory> dbHistory = scanHistoryRepository.findFirstByOriginalUrlOrRedirectFinalUrlOrderByScannedAtDesc(url,url);
         if (dbHistory.isEmpty()) {
             return null; // DB에도 없으면 분석이 아직 안 끝났거나 없는 URL
         }
@@ -307,18 +307,31 @@ public class QrScanRedisService {
     /**
 
      */
-    public void cacheAnalysisResult(String url, AnalysisResponse resultDto,Duration ttl) {
+    public void cacheAnalysisResult(AnalysisResponse resultDto, Duration ttl) {
         try {
-            // 1. 상세 리포트 캐싱 (AnalysisResponse 객체를 통째로 JSON으로 변환하여 저장)
-            String urlKey = buildUrlCacheKey(url);
-            String jsonCache = objectMapper.writeValueAsString(resultDto);
-            // 🚨 핵심: 고정된 URL_CACHE_TTL 대신, 밖에서 받아온 동적 ttl을 꽂아줍니다!
-            redisTemplate.opsForValue().set(urlKey, jsonCache, ttl);
+            String originalUrl = resultDto.originalUrl();
+            String finalUrl = resultDto.redirect() != null ? resultDto.redirect().finalUrl() : null;
 
-            log.info("URL 상세 분석 결과 캐싱 완료: {} (적용된 TTL: {}일)", url, ttl.toDays());
+            // 저장할 데이터는 동일하므로 한 번만 JSON으로 변환
+            String jsonCache = objectMapper.writeValueAsString(resultDto);
+
+            // 1. 원본 URL로 캐싱
+            if (originalUrl != null && !originalUrl.isBlank()) {
+                String originalKey = buildUrlCacheKey(originalUrl);
+                redisTemplate.opsForValue().set(originalKey, jsonCache, ttl);
+            }
+
+            // 2. 최종 URL로도 캐싱 (단, 원본 URL과 다를 경우에만!)
+            if (finalUrl != null && !finalUrl.isBlank() && !finalUrl.equals(originalUrl)) {
+                String finalKey = buildUrlCacheKey(finalUrl);
+                redisTemplate.opsForValue().set(finalKey, jsonCache, ttl);
+            }
+
+            log.info("URL 상세 분석 결과 캐싱 완료 (다중 키 적용) - 원본: {}, 최종: {} (TTL: {}일)",
+                    originalUrl, finalUrl, ttl.toDays());
 
         } catch (Exception e) {
-            log.error("Redis 캐싱 실패 - URL: {}", url, e);
+            log.error("Redis 캐싱 실패", e);
         }
     }
 
@@ -379,6 +392,10 @@ public class QrScanRedisService {
 
         // 1. 정규화: 앞뒤 공백 제거
         String cleanUrl = rawUrl.trim();
+        // 프론트가 "https://yes24.com/" 라고 보내든 "https://yes24.com" 이라고 보내든 똑같이 취급합니다.
+        if (cleanUrl.endsWith("/")) {
+            cleanUrl = cleanUrl.substring(0, cleanUrl.length() - 1);
+        }
 
         // 2. Fragment(#)만 제거하고, QueryString(?)은 반드시 보존!
         // 브라우저 내부용인 # 뒤는 잘라도 되지만, ? 뒤는 데이터이므로 남깁니다.
@@ -533,7 +550,7 @@ public class QrScanRedisService {
             // 3. 차등 TTL 적용하여 Redis 캐시 워밍 (수정된 부분!)
             // ==========================================
             Duration dynamicTtl = calculateDynamicTtl(responseDto.riskLevel());
-            cacheAnalysisResult(url, responseDto, dynamicTtl);
+            cacheAnalysisResult( responseDto, dynamicTtl);
             //  분석 완료 후 유저 개인의 Redis 히스토리 리스트에도 추가!
             saveHistoryToRedis(guestUuid, responseDto);
 

@@ -8,5 +8,6 @@ import java.util.Optional;
 @Repository
 public interface ScanHistoryRepository extends JpaRepository<ScanHistory, Long> {
     Optional<ScanHistory> findFirstByOriginalUrlOrderByScannedAtDesc(String originalUrl);
+    Optional<ScanHistory> findFirstByOriginalUrlOrRedirectFinalUrlOrderByScannedAtDesc(String originalUrl, String finalUrl);
 
 }
