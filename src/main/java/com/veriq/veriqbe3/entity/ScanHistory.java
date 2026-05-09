@@ -28,6 +28,9 @@ public class ScanHistory {
     private String originalUrl;
 
     private String typeInfo;
+    @Column(name = "final_threats")
+    private String threats;
+    private String domainAge;
 
     @Enumerated(EnumType.STRING)
     private SchemeType schemeType;
@@ -59,6 +62,7 @@ public class ScanHistory {
 
     @Embeddable @Getter @Builder @NoArgsConstructor @AllArgsConstructor
     public static class MlInfo {
+        @Column(name = "ml_threats")
         private String threats;
         private Integer mlScore;
     }

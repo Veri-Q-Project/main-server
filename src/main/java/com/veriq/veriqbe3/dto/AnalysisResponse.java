@@ -15,6 +15,7 @@ public record AnalysisResponse(
         String originalUrl,
         HttpsInfo https,
         ShortUrlInfo shortUrl,
+        List<String> threats,
         MlInfo ml,
         ExternalApiInfo externalApi,
         Integer reportCount,
@@ -32,6 +33,7 @@ public record AnalysisResponse(
             @JsonProperty("originalUrl") @JsonAlias({"original_url", "url"}) String originalUrl,
             @JsonProperty("https") HttpsInfo https,
             @JsonProperty("shortUrl") ShortUrlInfo shortUrl,
+            @JsonProperty("threats") List<String> threats,
             @JsonProperty("ml") MlInfo ml,
             @JsonProperty("externalApi") @JsonAlias({"safe_browsing"}) ExternalApiInfo externalApi,
             @JsonProperty("reportCount") @JsonAlias({"report_count"}) Integer reportCount,
@@ -46,6 +48,7 @@ public record AnalysisResponse(
         this.originalUrl = originalUrl;
         this.https = https;
         this.shortUrl = shortUrl;
+        this.threats = threats;
         this.ml = ml;
         this.externalApi = externalApi;
         this.reportCount = reportCount;
@@ -84,6 +87,7 @@ public record AnalysisResponse(
                     },
                     example = "['too_many_redirects', 'MALWARE']"
             )
+
             List<String> threats,
             @JsonAlias({"mlScore", "score"})
             Integer score

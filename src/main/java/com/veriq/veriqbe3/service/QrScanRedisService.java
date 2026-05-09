@@ -412,10 +412,17 @@ public class QrScanRedisService {
      * DB 엔티티(ScanHistory)를 Redis용 캐시/응답 DTO(AnalysisResponse)로 변환하는 헬퍼 메서드
      */
     private AnalysisResponse convertToAnalysisResponse(ScanHistory entity) {
-        // DB의 threats(String)를 List<String>으로 변환 (콤마 분리 가정)
-        java.util.List<String> threatsList = Collections.emptyList();
+
+        // 1. 최상단 위협 리스트 변환 (DB의 문자열 -> List<String>)
+        java.util.List<String> coreThreatsList = java.util.Collections.emptyList();
+        if (entity.getThreats() != null && !entity.getThreats().isBlank()) {
+            coreThreatsList = java.util.Arrays.asList(entity.getThreats().split(",\\s*"));
+        }
+
+        // 2. ML 위협 리스트 변환 (DB의 문자열 -> List<String>)
+        java.util.List<String> mlThreatsList = java.util.Collections.emptyList();
         if (entity.getMl() != null && entity.getMl().getThreats() != null && !entity.getMl().getThreats().isBlank()) {
-            threatsList = Arrays.asList(entity.getMl().getThreats().split(",\\s*"));
+            mlThreatsList = java.util.Arrays.asList(entity.getMl().getThreats().split(",\\s*"));
         }
 
         return new AnalysisResponse(
@@ -423,17 +430,26 @@ public class QrScanRedisService {
                 entity.getOriginalUrl(),
                 entity.getHttps() != null ? new AnalysisResponse.HttpsInfo(entity.getHttps().isSecure()) : null,
                 entity.getShortUrl() != null ? new AnalysisResponse.ShortUrlInfo(entity.getShortUrl().isShortened()) : null,
-                entity.getMl() != null ? new AnalysisResponse.MlInfo(threatsList, entity.getMl().getMlScore()) : null,
+
+                // 🚨 [추가됨] 새로 만든 최상단 위협 리스트를 5번째 파라미터로 쏙!
+                coreThreatsList,
+
+                // 🚨 [수정됨] 기존 threatsList 대신 새로 정의한 mlThreatsList 사용
+                entity.getMl() != null ? new AnalysisResponse.MlInfo(mlThreatsList, entity.getMl().getMlScore()) : null,
+
                 entity.getExternalApi() != null ? new AnalysisResponse.ExternalApiInfo(
                         entity.getExternalApi().isApiChecked(),
                         entity.getExternalApi().getApiProvider(),
                         entity.getExternalApi().getApiResult()
                 ) : null,
-                // ✅ 새로 들어갈 3줄 (reportCount, blockCount, domainAge)
+
+                // ✅ dbReportCount, dbBlockCount
                 entity.getInternalDb() != null ? entity.getInternalDb().getDbReportCount() : null,
                 entity.getInternalDb() != null ? entity.getInternalDb().getDbBlockCount() : null,
-                null, // domainAge는 아직 DB에 없으므로 null 처리
-                // ✅
+
+                // 🚨 [수정됨] 이제 DB에 domainAge가 있으므로 null 대신 entity.getDomainAge() 사용
+                entity.getDomainAge(),
+
                 entity.getRedirect() != null ? new AnalysisResponse.RedirectInfo(
                         entity.getRedirect().getFinalUrl(),
                         entity.getRedirect().getRedirectCount()
