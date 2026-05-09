@@ -501,6 +501,13 @@ public class QrScanRedisService {
                     .totalScore(responseDto.score() != null ? responseDto.score() : 0)
                     .riskLevel(responseDto.riskLevel() != null ? responseDto.riskLevel().name() : "SUSPICIOUS")
 
+                    // 🚨 [범인 검거 1] 최상단 위협 리스트 저장 (이게 빠져있었습니다!)
+                    .threats(responseDto.threats() != null && !responseDto.threats().isEmpty()
+                            ? String.join(", ", responseDto.threats()) : null)
+
+                    // 🚨 [범인 검거 2] 도메인 연령 저장 (이것도 빠져있었습니다!)
+                    .domainAge(responseDto.domainAge())
+
                     // 1. HttpsInfo 빌드
                     .https(ScanHistory.HttpsInfo.builder()
                             .isSecure(responseDto.https() != null && responseDto.https().isSecure())
@@ -533,7 +540,6 @@ public class QrScanRedisService {
                             .dbBlockCount(responseDto.blockCount())
                             .build())
 
-
                     // 6. RedirectInfo 빌드
                     .redirect(ScanHistory.RedirectInfo.builder()
                             .finalUrl(responseDto.redirect() != null ? responseDto.redirect().finalUrl() : url)
@@ -563,18 +569,14 @@ public class QrScanRedisService {
             log.info("DB 저장 완료: {}", url);
 
             // ==========================================
-            // 3. 차등 TTL 적용하여 Redis 캐시 워밍 (수정된 부분!)
+            // 3. 차등 TTL 적용하여 Redis 캐시 워밍
             // ==========================================
             Duration dynamicTtl = calculateDynamicTtl(responseDto.riskLevel());
-            cacheAnalysisResult( responseDto, dynamicTtl);
+            cacheAnalysisResult(responseDto, dynamicTtl);
             //  분석 완료 후 유저 개인의 Redis 히스토리 리스트에도 추가!
             saveHistoryToRedis(guestUuid, responseDto);
 
             log.info("모든 저장 및 동적 캐싱 프로세스 완료");
-            // 프론트엔드로 프로세스 완료 알림 진행...
-
-
-
 
         } catch (Exception e) {
             log.error("DB 저장 및 캐싱 중 에러 발생: {}", responseDto.originalUrl(), e);
