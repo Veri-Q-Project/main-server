@@ -36,6 +36,8 @@ public record AnalysisResponse(
         )
         List<String> threats,
 
+        @Schema(hidden = true)
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         MlInfo ml,
         ExternalApiInfo externalApi,
         Integer reportCount,
