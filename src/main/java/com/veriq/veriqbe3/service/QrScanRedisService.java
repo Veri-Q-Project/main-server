@@ -247,7 +247,7 @@ public class QrScanRedisService {
         }
         //  Redis에 없으면 DB에서 조회
         //스캔한 내역중 최신 내역을 db에서 뽑아옴
-        Optional<ScanHistory> dbHistory = scanHistoryRepository.findFirstByOriginalUrlOrderByScannedAtDesc(url);
+        Optional<ScanHistory> dbHistory = scanHistoryRepository.findFirstByOriginalUrlOrRedirectFinalUrlOrderByScannedAtDesc(url,url);
         if (dbHistory.isEmpty()) {
             return null; // DB에도 없으면 분석이 아직 안 끝났거나 없는 URL
         }
@@ -307,18 +307,31 @@ public class QrScanRedisService {
     /**
 
      */
-    public void cacheAnalysisResult(String url, AnalysisResponse resultDto,Duration ttl) {
+    public void cacheAnalysisResult(AnalysisResponse resultDto, Duration ttl) {
         try {
-            // 1. 상세 리포트 캐싱 (AnalysisResponse 객체를 통째로 JSON으로 변환하여 저장)
-            String urlKey = buildUrlCacheKey(url);
-            String jsonCache = objectMapper.writeValueAsString(resultDto);
-            // 🚨 핵심: 고정된 URL_CACHE_TTL 대신, 밖에서 받아온 동적 ttl을 꽂아줍니다!
-            redisTemplate.opsForValue().set(urlKey, jsonCache, ttl);
+            String originalUrl = resultDto.originalUrl();
+            String finalUrl = resultDto.redirect() != null ? resultDto.redirect().finalUrl() : null;
 
-            log.info("URL 상세 분석 결과 캐싱 완료: {} (적용된 TTL: {}일)", url, ttl.toDays());
+            // 저장할 데이터는 동일하므로 한 번만 JSON으로 변환
+            String jsonCache = objectMapper.writeValueAsString(resultDto);
+
+            // 1. 원본 URL로 캐싱
+            if (originalUrl != null && !originalUrl.isBlank()) {
+                String originalKey = buildUrlCacheKey(originalUrl);
+                redisTemplate.opsForValue().set(originalKey, jsonCache, ttl);
+            }
+
+            // 2. 최종 URL로도 캐싱 (단, 원본 URL과 다를 경우에만!)
+            if (finalUrl != null && !finalUrl.isBlank() && !finalUrl.equals(originalUrl)) {
+                String finalKey = buildUrlCacheKey(finalUrl);
+                redisTemplate.opsForValue().set(finalKey, jsonCache, ttl);
+            }
+
+            log.info("URL 상세 분석 결과 캐싱 완료 (다중 키 적용) - 원본: {}, 최종: {} (TTL: {}일)",
+                    originalUrl, finalUrl, ttl.toDays());
 
         } catch (Exception e) {
-            log.error("Redis 캐싱 실패 - URL: {}", url, e);
+            log.error("Redis 캐싱 실패", e);
         }
     }
 
@@ -379,6 +392,10 @@ public class QrScanRedisService {
 
         // 1. 정규화: 앞뒤 공백 제거
         String cleanUrl = rawUrl.trim();
+        // 프론트가 "https://yes24.com/" 라고 보내든 "https://yes24.com" 이라고 보내든 똑같이 취급합니다.
+        if (cleanUrl.endsWith("/")) {
+            cleanUrl = cleanUrl.substring(0, cleanUrl.length() - 1);
+        }
 
         // 2. Fragment(#)만 제거하고, QueryString(?)은 반드시 보존!
         // 브라우저 내부용인 # 뒤는 잘라도 되지만, ? 뒤는 데이터이므로 남깁니다.
@@ -395,10 +412,17 @@ public class QrScanRedisService {
      * DB 엔티티(ScanHistory)를 Redis용 캐시/응답 DTO(AnalysisResponse)로 변환하는 헬퍼 메서드
      */
     private AnalysisResponse convertToAnalysisResponse(ScanHistory entity) {
-        // DB의 threats(String)를 List<String>으로 변환 (콤마 분리 가정)
-        java.util.List<String> threatsList = Collections.emptyList();
+
+        // 1. 최상단 위협 리스트 변환 (DB의 문자열 -> List<String>)
+        java.util.List<String> coreThreatsList = java.util.Collections.emptyList();
+        if (entity.getThreats() != null && !entity.getThreats().isBlank()) {
+            coreThreatsList = java.util.Arrays.asList(entity.getThreats().split(",\\s*"));
+        }
+
+        // 2. ML 위협 리스트 변환 (DB의 문자열 -> List<String>)
+        java.util.List<String> mlThreatsList = java.util.Collections.emptyList();
         if (entity.getMl() != null && entity.getMl().getThreats() != null && !entity.getMl().getThreats().isBlank()) {
-            threatsList = Arrays.asList(entity.getMl().getThreats().split(",\\s*"));
+            mlThreatsList = java.util.Arrays.asList(entity.getMl().getThreats().split(",\\s*"));
         }
 
         return new AnalysisResponse(
@@ -406,17 +430,26 @@ public class QrScanRedisService {
                 entity.getOriginalUrl(),
                 entity.getHttps() != null ? new AnalysisResponse.HttpsInfo(entity.getHttps().isSecure()) : null,
                 entity.getShortUrl() != null ? new AnalysisResponse.ShortUrlInfo(entity.getShortUrl().isShortened()) : null,
-                entity.getMl() != null ? new AnalysisResponse.MlInfo(threatsList, entity.getMl().getMlScore()) : null,
+
+                // 🚨 [추가됨] 새로 만든 최상단 위협 리스트를 5번째 파라미터로 쏙!
+                coreThreatsList,
+
+                // 🚨 [수정됨] 기존 threatsList 대신 새로 정의한 mlThreatsList 사용
+                entity.getMl() != null ? new AnalysisResponse.MlInfo(mlThreatsList, entity.getMl().getMlScore()) : null,
+
                 entity.getExternalApi() != null ? new AnalysisResponse.ExternalApiInfo(
                         entity.getExternalApi().isApiChecked(),
                         entity.getExternalApi().getApiProvider(),
                         entity.getExternalApi().getApiResult()
                 ) : null,
-                // ✅ 새로 들어갈 3줄 (reportCount, blockCount, domainAge)
+
+                // ✅ dbReportCount, dbBlockCount
                 entity.getInternalDb() != null ? entity.getInternalDb().getDbReportCount() : null,
                 entity.getInternalDb() != null ? entity.getInternalDb().getDbBlockCount() : null,
-                null, // domainAge는 아직 DB에 없으므로 null 처리
-                // ✅
+
+                // 🚨 [수정됨] 이제 DB에 domainAge가 있으므로 null 대신 entity.getDomainAge() 사용
+                entity.getDomainAge(),
+
                 entity.getRedirect() != null ? new AnalysisResponse.RedirectInfo(
                         entity.getRedirect().getFinalUrl(),
                         entity.getRedirect().getRedirectCount()
@@ -468,6 +501,13 @@ public class QrScanRedisService {
                     .totalScore(responseDto.score() != null ? responseDto.score() : 0)
                     .riskLevel(responseDto.riskLevel() != null ? responseDto.riskLevel().name() : "SUSPICIOUS")
 
+                    // 🚨 [범인 검거 1] 최상단 위협 리스트 저장 (이게 빠져있었습니다!)
+                    .threats(responseDto.threats() != null && !responseDto.threats().isEmpty()
+                            ? String.join(", ", responseDto.threats()) : null)
+
+                    // 🚨 [범인 검거 2] 도메인 연령 저장 (이것도 빠져있었습니다!)
+                    .domainAge(responseDto.domainAge())
+
                     // 1. HttpsInfo 빌드
                     .https(ScanHistory.HttpsInfo.builder()
                             .isSecure(responseDto.https() != null && responseDto.https().isSecure())
@@ -500,7 +540,6 @@ public class QrScanRedisService {
                             .dbBlockCount(responseDto.blockCount())
                             .build())
 
-
                     // 6. RedirectInfo 빌드
                     .redirect(ScanHistory.RedirectInfo.builder()
                             .finalUrl(responseDto.redirect() != null ? responseDto.redirect().finalUrl() : url)
@@ -530,18 +569,14 @@ public class QrScanRedisService {
             log.info("DB 저장 완료: {}", url);
 
             // ==========================================
-            // 3. 차등 TTL 적용하여 Redis 캐시 워밍 (수정된 부분!)
+            // 3. 차등 TTL 적용하여 Redis 캐시 워밍
             // ==========================================
             Duration dynamicTtl = calculateDynamicTtl(responseDto.riskLevel());
-            cacheAnalysisResult(url, responseDto, dynamicTtl);
+            cacheAnalysisResult(responseDto, dynamicTtl);
             //  분석 완료 후 유저 개인의 Redis 히스토리 리스트에도 추가!
             saveHistoryToRedis(guestUuid, responseDto);
 
             log.info("모든 저장 및 동적 캐싱 프로세스 완료");
-            // 프론트엔드로 프로세스 완료 알림 진행...
-
-
-
 
         } catch (Exception e) {
             log.error("DB 저장 및 캐싱 중 에러 발생: {}", responseDto.originalUrl(), e);

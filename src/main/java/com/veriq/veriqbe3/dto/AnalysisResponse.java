@@ -15,6 +15,29 @@ public record AnalysisResponse(
         String originalUrl,
         HttpsInfo https,
         ShortUrlInfo shortUrl,
+
+        // 🚨 [수정됨] GSB:, OTX: 접두사 제거 및 중복(MALWARE) 통합!
+        @Schema(
+                description = "### 🚨 탐지 위협 카테고리 상세\n" +
+                        "**1. URL 구조 및 패턴**\n" +
+                        "- `SHORTENED_URL`, `percent_encoding_detected`, `double_encoding_suspected`, `suspicious_query_param_detected`, `embedded_url`, `suspicious_query_keyword_detected`, `suspicious_path_keyword_detected`, `suspicious_fragment_keyword_detected`\n\n" +
+                        "**2. 외부 위협 인텔리전스 (GSB, OTX 통합)**\n" +
+                        "- `MALWARE`, `SOCIAL_ENGINEERING`, `UNWANTED_SOFTWARE`, `POTENTIALLY_HARMFUL_APPLICATION`, `PHISHING`, `RANSOMWARE`, `BOTNET`, `SPAM`, `C2`, `SUSPICIOUS`\n\n" +
+                        "**3. 인증서 및 연결 오류**\n" +
+                        "- `hostname_missing`, `certificate_request_timeout`, `invalid certificate response`, `peer certificate not available`",
+                allowableValues = {
+                        "SHORTENED_URL", "percent_encoding_detected", "double_encoding_suspected", "suspicious_query_param_detected",
+                        "embedded_url", "suspicious_query_keyword_detected", "suspicious_path_keyword_detected", "suspicious_fragment_keyword_detected",
+                        "MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION",
+                        "PHISHING", "RANSOMWARE", "BOTNET", "SPAM", "C2", "SUSPICIOUS",
+                        "hostname_missing", "certificate_request_timeout", "invalid certificate response", "peer certificate not available"
+                },
+                example = "['PHISHING', 'SHORTENED_URL']"
+        )
+        List<String> threats,
+
+        @Schema(hidden = true)
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         MlInfo ml,
         ExternalApiInfo externalApi,
         Integer reportCount,
@@ -25,13 +48,13 @@ public record AnalysisResponse(
         Integer score,
         RiskLevel riskLevel
 ) {
-    // 🚨 [무식하지만 100% 확실한 방법] Jackson 멱살 잡고 매핑 강제 지시
     @JsonCreator
     public AnalysisResponse(
             @JsonProperty("analysisTime") @JsonAlias({"analysis_time"}) String analysisTime,
             @JsonProperty("originalUrl") @JsonAlias({"original_url", "url"}) String originalUrl,
             @JsonProperty("https") HttpsInfo https,
             @JsonProperty("shortUrl") ShortUrlInfo shortUrl,
+            @JsonProperty("threats") List<String> threats,
             @JsonProperty("ml") MlInfo ml,
             @JsonProperty("externalApi") @JsonAlias({"safe_browsing"}) ExternalApiInfo externalApi,
             @JsonProperty("reportCount") @JsonAlias({"report_count"}) Integer reportCount,
@@ -46,6 +69,7 @@ public record AnalysisResponse(
         this.originalUrl = originalUrl;
         this.https = https;
         this.shortUrl = shortUrl;
+        this.threats = threats;
         this.ml = ml;
         this.externalApi = externalApi;
         this.reportCount = reportCount;
@@ -57,34 +81,14 @@ public record AnalysisResponse(
         this.riskLevel = riskLevel;
     }
 
-    public record HttpsInfo(
-            boolean isSecure
-    ) {}
-
-    public record ShortUrlInfo(
-            boolean isShortened
-    ) {}
+    public record HttpsInfo(boolean isSecure) {}
+    public record ShortUrlInfo(boolean isShortened) {}
 
     public record MlInfo(
-            @Schema(
-                    description = "###  탐지 위협 카테고리 상세\n" +
-                            "**1. 리다이렉트 관련**\n" +
-                            "- `too_many_redirects`, `loop_detected`, `invalid_location`\n\n" +
-                            "**2. URL 구조 관련**\n" +
-                            "- `shortened_url`, `embedded_url`, `percent_encoding_detected`, `double_encoding_suspected`\n\n" +
-                            "**3. 구글 세이프 브라우징(GSB)**\n" +
-                            "- `MALWARE`, `SOCIAL_ENGINEERING`, `UNWANTED_SOFTWARE`, `POTENTIALLY_HARMFUL_APPLICATION`\n\n" +
-                            "**4. 기타 탐지**\n" +
-                            "- `suspicious_param_detected`, `suspicious_keyword_detected`",
-                    allowableValues = {
-                            "too_many_redirects", "loop_detected", "invalid_location",
-                            "shortened_url", "embedded_url", "percent_encoding_detected", "double_encoding_suspected",
-                            "MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION",
-                            "suspicious_param_detected", "suspicious_keyword_detected"
-                    },
-                    example = "['too_many_redirects', 'MALWARE']"
-            )
+            @Schema(hidden = true)
+            @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
             List<String> threats,
+
             @JsonAlias({"mlScore", "score"})
             Integer score
     ) {}
@@ -92,11 +96,22 @@ public record AnalysisResponse(
     public record ExternalApiInfo(
             boolean checked,
             String provider,
+
+            @Schema(
+                    description = "외부 API 통합 검사 결과",
+                    allowableValues = {
+                            "THREAT", "SAFE", "UNKNOWN",
+                            "GSB_FAILED", "OTX_FAILED", "WHOIS_FAILED", "GSB_OTX_WHOIS_FAILED"
+                    }
+            )
             String result
     ) {}
 
     public record RedirectInfo(
             String finalUrl,
+
+            @Schema(hidden = true)
+            @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
             Integer redirectCount
     ) {}
 
