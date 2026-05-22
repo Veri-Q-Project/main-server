@@ -103,13 +103,15 @@ public class QrScanController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
-
     @Operation(
             summary = "URL 텍스트 직접 입력 분석 시작",
             description = """
             ### 텍스트 기반 URL 분석 요청
             QR 이미지 대신, 사용자가 텍스트 창에 직접 입력하거나 복사해 넣은 URL을 검사합니다.
-            동작 방식과 응답 포맷(status)은 기존 `/upload` API와 **100% 동일**합니다.
+            
+            **[요청 방법]**
+            - `url`: 검사할 문자열을 쿼리 파라미터로 전송합니다. (예: `?url=https://...`)
+            - `guest_uuid`: 헤더에 반드시 포함해야 합니다.
             
             **[참고사항]**
             - 프론트엔드는 이 API를 호출하기 전 반드시 `/subscribe`로 SSE 파이프를 먼저 연결해야 합니다.
@@ -121,17 +123,16 @@ public class QrScanController {
             @ApiResponse(responseCode = "400", description = "입력값이 비어있거나 잘못된 요청 형식"),
             @ApiResponse(responseCode = "500", description = "서버 내부 에러 발생")
     })
-    @PostMapping(value = "/text", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping(value = "/text")
     public ResponseEntity<?> uploadTextUrl(
             @RequestHeader(value = "guest_uuid") String guestUuid,
-            @Valid @RequestBody TextInputRequest request) {
+            @RequestParam("url") String url) { // 🚨 Body 대신 RequestParam(쿼리 파라미터)으로 받습니다.
         try {
-            log.info("텍스트 직접 입력 분석 요청 - URL: {}, guestUuid: {}", request.url(), guestUuid);
+            log.info("텍스트 직접 입력 분석 요청 (GET) - URL: {}, guestUuid: {}", url, guestUuid);
 
-            // 🚨 QR 디코더를 거치지 않고 바로 문자열을 서비스로 넘깁니다. (서비스 계층에 해당 메서드 추가 필요)
-            Object response = qrScanRedisService.processTextWithRedis(request.url(), guestUuid);
+            // 🚨 request.url() 대신 파라미터로 받은 url을 바로 넘깁니다.
+            Object response = qrScanRedisService.processTextWithRedis(url, guestUuid);
 
-            // 로직은 기존 QR 업로드와 완벽히 동일하게 처리
             if (response instanceof AnalysisResponse) {
                 log.info("✅ 신선한 데이터 적중! 분석 결과를 즉시 반환합니다.");
                 return ResponseEntity.ok(response);
@@ -148,15 +149,6 @@ public class QrScanController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
-
-    public record TextInputRequest(
-            @Schema(
-                    description = "검사할 URL 또는 딥링크 텍스트",
-                    example = "https://www.google.com",
-                    requiredMode = Schema.RequiredMode.REQUIRED
-            )
-            String url
-    ) {}
     //  스캔 내역 및 로딩화면 후 상세 보고서 API 엔드포인트 ,프런트랑 연결
     @Operation(
             summary = "분석 결과 상세 조회",
