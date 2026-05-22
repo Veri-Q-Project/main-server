@@ -24,15 +24,18 @@ public record AnalysisResponse(
                         "**2. 외부 위협 인텔리전스 (GSB, OTX 통합)**\n" +
                         "- `MALWARE`, `SOCIAL_ENGINEERING`, `UNWANTED_SOFTWARE`, `POTENTIALLY_HARMFUL_APPLICATION`, `PHISHING`, `RANSOMWARE`, `BOTNET`, `SPAM`, `C2`, `SUSPICIOUS`\n\n" +
                         "**3. 인증서 및 연결 오류**\n" +
-                        "- `hostname_missing`, `certificate_request_timeout`, `invalid certificate response`, `peer certificate not available`",
+                        "- `CERT_SELF_SIGNED`, `CERT_UNTRUSTED`, `CERT_EXPIRED`, `CERT_HOSTNAME_MISMATCH`, `CERT_NOT_YET_VALID`, `CERT_REVOKED`, `CERT_SSL_ERROR`, `CERT_INVALID_HOST`, `CERT_CONNECTION_FAILED`, `CERT_LOOKUP_FAILED`, `CERT_TIMEOUT`, `CERT_NO_CERTIFICATE`, `CERT_UNKNOWN_ERROR`",
                 allowableValues = {
                         "SHORTENED_URL", "percent_encoding_detected", "double_encoding_suspected", "suspicious_query_param_detected",
                         "embedded_url", "suspicious_query_keyword_detected", "suspicious_path_keyword_detected", "suspicious_fragment_keyword_detected",
                         "MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION",
                         "PHISHING", "RANSOMWARE", "BOTNET", "SPAM", "C2", "SUSPICIOUS",
-                        "hostname_missing", "certificate_request_timeout", "invalid certificate response", "peer certificate not available"
+                        // 👇 기존 소문자 및 원문 에러를 지우고 새로운 규격 상수 추가!
+                        "CERT_SELF_SIGNED", "CERT_UNTRUSTED", "CERT_EXPIRED", "CERT_HOSTNAME_MISMATCH",
+                        "CERT_NOT_YET_VALID", "CERT_REVOKED", "CERT_SSL_ERROR", "CERT_INVALID_HOST",
+                        "CERT_CONNECTION_FAILED", "CERT_LOOKUP_FAILED", "CERT_TIMEOUT", "CERT_NO_CERTIFICATE", "CERT_UNKNOWN_ERROR"
                 },
-                example = "['PHISHING', 'SHORTENED_URL']"
+                example = "['PHISHING', 'CERT_SELF_SIGNED']"
         )
         List<String> threats,
 

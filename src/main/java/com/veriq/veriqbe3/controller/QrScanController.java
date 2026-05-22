@@ -62,7 +62,7 @@ public class QrScanController {
         - 🟡 **`status == "PROCESSING"` (신규 분석 필요)**
             - **반드시 `/subscribe` 엔드포인트로 SSE 파이프를 연결해야 합니다.**
             - SSE로 전달되는 `step`, `status` 정보를 실시간으로 로딩 UI에 바인딩하세요.
-            
+        
         **3. 스킴 타입(`schemeType`) 처리**
         - `PROCESSING` 상태일 때는 값이 들어와도 **무시**합니다.
         - `COMPLETED` 상태가 되었을 때:
@@ -103,6 +103,60 @@ public class QrScanController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
+
+    @Operation(
+            summary = "URL 텍스트 직접 입력 분석 시작",
+            description = """
+            ### 텍스트 기반 URL 분석 요청
+            QR 이미지 대신, 사용자가 텍스트 창에 직접 입력하거나 복사해 넣은 URL을 검사합니다.
+            동작 방식과 응답 포맷(status)은 기존 `/upload` API와 **100% 동일**합니다.
+            
+            **[참고사항]**
+            - 프론트엔드는 이 API를 호출하기 전 반드시 `/subscribe`로 SSE 파이프를 먼저 연결해야 합니다.
+            """
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "캐시 적중: 기존 분석 데이터가 있어 즉시 완료됨 (status: COMPLETED)"),
+            @ApiResponse(responseCode = "202", description = "신규 분석: 파이썬 서버로 분석을 지시함 (status: PROCESSING, SSE 대기 필요)"),
+            @ApiResponse(responseCode = "400", description = "입력값이 비어있거나 잘못된 요청 형식"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 에러 발생")
+    })
+    @PostMapping(value = "/text", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> uploadTextUrl(
+            @RequestHeader(value = "guest_uuid") String guestUuid,
+            @Valid @RequestBody TextInputRequest request) {
+        try {
+            log.info("텍스트 직접 입력 분석 요청 - URL: {}, guestUuid: {}", request.url(), guestUuid);
+
+            // 🚨 QR 디코더를 거치지 않고 바로 문자열을 서비스로 넘깁니다. (서비스 계층에 해당 메서드 추가 필요)
+            Object response = qrScanRedisService.processTextWithRedis(request.url(), guestUuid);
+
+            // 로직은 기존 QR 업로드와 완벽히 동일하게 처리
+            if (response instanceof AnalysisResponse) {
+                log.info("✅ 신선한 데이터 적중! 분석 결과를 즉시 반환합니다.");
+                return ResponseEntity.ok(response);
+            } else {
+                log.info("🔄 파이썬 서버로 분석을 지시했습니다. 프론트엔드에 대기 신호를 보냅니다.");
+                return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
+            }
+
+        } catch (IllegalArgumentException e) {
+            log.warn("잘못된 텍스트 입력 요청 - guestUuid: {}", guestUuid, e);
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            log.error("텍스트 분석 요청 처리 중 서버 내부 에러 발생 - guestUuid: {}", guestUuid, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    public record TextInputRequest(
+            @Schema(
+                    description = "검사할 URL 또는 딥링크 텍스트",
+                    example = "https://www.google.com",
+                    requiredMode = Schema.RequiredMode.REQUIRED
+            )
+            String url
+    ) {}
     //  스캔 내역 및 로딩화면 후 상세 보고서 API 엔드포인트 ,프런트랑 연결
     @Operation(
             summary = "분석 결과 상세 조회",
@@ -154,7 +208,7 @@ public class QrScanController {
         try {
             // 🚨 1. 가장 먼저 UUID부터 검사합니다! (입구 컷)
             if (guestUuid == null || guestUuid.isBlank()) {
-                log.error("❌ [콜백 실패] 파이썬이 헤더에 guest_uuid를 안 보냈습니다! URL: {}", resultDto.originalUrl());
+                log.error("❌ [콜백 실패] 파이썬이 헤더에 guest_uuid를 안 보냈습니다zkzk! URL: {}", resultDto.originalUrl());
                 // UUID가 없으면 DB 저장도, SSE 통신도 할 필요 없이 바로 반송!
                 return ResponseEntity.badRequest().body("guest_uuid is missing");
             }

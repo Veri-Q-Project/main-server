@@ -49,28 +49,50 @@ public class QrScanRedisService {
     private static final Duration HISTORY_TTL = Duration.ofDays(7);
 
 
+    // ==============================================================================
+    // 1. [기존] QR 이미지 업로드 시 호출되는 메서드
+    // ==============================================================================
     public Object processWithRedis(MultipartFile image, String guestUuid) throws Exception {
-
         String url = qrDecoder.decode(image);
-        // 2. 디코딩 성공 시, 프론트로 실시간 텍스트만 쏘기!
-        //  [방어 로직] 디코딩 실패 시 (QR이 아니거나 깨진 이미지) 즉시 에러 던지기
+
         if (url == null || url.isEmpty()) {
             throw new IllegalArgumentException("QR 코드 디코딩에 실패했습니다.");
         }
 
-        // 2. URL 분류
+        // QR에서 온 요청임을 표시(true)하여 공통 로직으로 전달
+        return executeAnalysisFlow(url, guestUuid, true);
+    }
+
+    // ==============================================================================
+    // 2. [신규] 텍스트(URL) 직접 입력 시 호출되는 메서드
+    // ==============================================================================
+    public Object processTextWithRedis(String rawText, String guestUuid) throws Exception {
+        if (rawText == null || rawText.isBlank()) {
+            throw new IllegalArgumentException("입력된 텍스트가 비어있습니다.");
+        }
+
+        // 텍스트 직접 입력임을 표시(false)하여 앞뒤 공백 제거 후 공통 로직으로 전달
+        return executeAnalysisFlow(rawText.trim(), guestUuid, false);
+    }
+
+    // ==============================================================================
+    // 3. [핵심] 공통 분석 로직 (기존 processWithRedis 내용 이동 및 메시지 분기)
+    // ==============================================================================
+    private Object executeAnalysisFlow(String url, String guestUuid, boolean isFromQr) throws Exception {
+
+        // 1. URL 분류
         SchemeClassifier.ClassificationResult result = schemeClassifier.classify(url);
 
-        // 3. 프론트로 실시간 텍스트 쏘기 (삼항 연산자로 깔끔하게 정리)
-        // 1. URL 여부와 메시지를 명확한 변수로 빼둡니다.
+        // 2. 프론트로 보낼 메시지 세팅 (QR/텍스트 입력 출처에 따라 다르게 설정)
         boolean isUrl = result.toBe2();
-        String decodingMsg = isUrl
-                ? "QR 코드 디코딩이 완료되었습니다."
-                : "QR 코드 내용을 확인한 결과 URL 형식이 아니었습니다.";
+        String decodingMsg;
+        if (isFromQr) {
+            decodingMsg = isUrl ? "QR 코드 디코딩이 완료되었습니다." : "QR 코드 내용을 확인한 결과 URL 형식이 아니었습니다.";
+        } else {
+            decodingMsg = isUrl ? "URL 입력이 확인되었습니다." : "입력하신 내용이 올바른 URL 형식이 아닙니다.";
+        }
 
-
-        log.info("[Decode] {}", decodingMsg);
-
+        log.info("[AnalysisFlow] {}", decodingMsg);
 // 2. [비 URL] 처리 로직
         if (!isUrl) {
             return QrScanResponse.builder()
