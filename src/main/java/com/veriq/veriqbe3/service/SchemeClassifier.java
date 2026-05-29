@@ -16,12 +16,17 @@ public class SchemeClassifier {
             Pattern.CASE_INSENSITIVE
     );
 
-    // 단축 URL 확인을 위한 패턴 (정확히 호스트명에 해당하는지 검사하기 위함)
     private static final List<Pattern> SHORTENER_PATTERNS = List.of(
-            Pattern.compile("^(https?://)?(www\\.)?bit\\.ly(/.*)?$", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("^(https?://)?(www\\.)?t\\.co(/.*)?$", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("^(https?://)?(www\\.)?goo\\.gl(/.*)?$", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("^(https?://)?(www\\.)?tinyurl\\.com(/.*)?$", Pattern.CASE_INSENSITIVE)
+            Pattern.compile("^(https?://)?(www\\.)?bit\\.ly(:\\d+)?([/?#].*)?$", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("^(https?://)?(www\\.)?t\\.co(:\\d+)?([/?#].*)?$", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("^(https?://)?(www\\.)?goo\\.gl(:\\d+)?([/?#].*)?$", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("^(https?://)?(www\\.)?tinyurl\\.com(:\\d+)?([/?#].*)?$", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("^(https?://)?(www\\.)?is\\.gd(:\\d+)?([/?#].*)?$", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("^(https?://)?(www\\.)?ow\\.ly(:\\d+)?([/?#].*)?$", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("^(https?://)?(www\\.)?c11\\.kr(:\\d+)?([/?#].*)?$", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("^(https?://)?(www\\.)?vvd\\.bz(:\\d+)?([/?#].*)?$", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("^(https?://)?(www\\.)?url\\.kr(:\\d+)?([/?#].*)?$", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("^(https?://)?(www\\.)?vo\\.la(:\\d+)?([/?#].*)?$", Pattern.CASE_INSENSITIVE)
     );
 
     // 2. 2차 인증 (OTP)
