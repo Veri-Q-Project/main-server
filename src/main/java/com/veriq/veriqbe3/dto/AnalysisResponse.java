@@ -18,24 +18,33 @@ public record AnalysisResponse(
 
         // 🚨 [수정됨] GSB:, OTX: 접두사 제거 및 중복(MALWARE) 통합!
         @Schema(
-                description = "### 🚨 탐지 위협 카테고리 상세\n" +
+                description = "### 🚨 탐지 위협 및 내부 분석 에러 카테고리 상세\n" +
                         "**1. URL 구조 및 패턴**\n" +
                         "- `SHORTENED_URL`, `percent_encoding_detected`, `double_encoding_suspected`, `suspicious_query_param_detected`, `embedded_url`, `suspicious_query_keyword_detected`, `suspicious_path_keyword_detected`, `suspicious_fragment_keyword_detected`\n\n" +
                         "**2. 외부 위협 인텔리전스 (GSB, OTX 통합)**\n" +
                         "- `MALWARE`, `SOCIAL_ENGINEERING`, `UNWANTED_SOFTWARE`, `POTENTIALLY_HARMFUL_APPLICATION`, `PHISHING`, `RANSOMWARE`, `BOTNET`, `SPAM`, `C2`, `SUSPICIOUS`\n\n" +
                         "**3. 인증서 및 연결 오류**\n" +
-                        "- `CERT_SELF_SIGNED`, `CERT_UNTRUSTED`, `CERT_EXPIRED`, `CERT_HOSTNAME_MISMATCH`, `CERT_NOT_YET_VALID`, `CERT_REVOKED`, `CERT_SSL_ERROR`, `CERT_INVALID_HOST`, `CERT_CONNECTION_FAILED`, `CERT_LOOKUP_FAILED`, `CERT_TIMEOUT`, `CERT_NO_CERTIFICATE`, `CERT_UNKNOWN_ERROR`",
+                        "- `CERT_SELF_SIGNED`, `CERT_UNTRUSTED`, `CERT_EXPIRED`, `CERT_HOSTNAME_MISMATCH`, `CERT_NOT_YET_VALID`, `CERT_REVOKED`, `CERT_SSL_ERROR`, `CERT_INVALID_HOST`, `CERT_CONNECTION_FAILED`, `CERT_LOOKUP_FAILED`, `CERT_TIMEOUT`, `CERT_NO_CERTIFICATE`, `CERT_UNKNOWN_ERROR`\n\n" +
+                        "**4. 분석 엔진 모듈별 실패 플래그 (Failure Flags)**\n" +
+                        "- **외부 API 조회 실패**: `GSB_FAILED`, `OTX_FAILED`, `WHOIS_FAILED`\n" +
+                        "- **리다이렉트 추적 실패**: `REDIRECT_FAILED`, `REDIRECT_REQUEST_FAILED`, `REDIRECT_CLIENT_ERROR`, `REDIRECT_LOOP_DETECTED`, `REDIRECT_TOO_MANY_REDIRECTS`, `REDIRECT_INVALID_LOCATION`\n" +
+                        "- **인프라 및 분석 모델 실패**: `SERVER_INFO_FAILED`, `CERTIFICATE_FAILED`, `CHARCNN_FAILED`, `XGB_FAILED`, `ML_FAILED`, `SCORING_FAILED`",
                 allowableValues = {
                         "SHORTENED_URL", "percent_encoding_detected", "double_encoding_suspected", "suspicious_query_param_detected",
                         "embedded_url", "suspicious_query_keyword_detected", "suspicious_path_keyword_detected", "suspicious_fragment_keyword_detected",
                         "MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION",
                         "PHISHING", "RANSOMWARE", "BOTNET", "SPAM", "C2", "SUSPICIOUS",
-                        // 👇 기존 소문자 및 원문 에러를 지우고 새로운 규격 상수 추가!
                         "CERT_SELF_SIGNED", "CERT_UNTRUSTED", "CERT_EXPIRED", "CERT_HOSTNAME_MISMATCH",
                         "CERT_NOT_YET_VALID", "CERT_REVOKED", "CERT_SSL_ERROR", "CERT_INVALID_HOST",
-                        "CERT_CONNECTION_FAILED", "CERT_LOOKUP_FAILED", "CERT_TIMEOUT", "CERT_NO_CERTIFICATE", "CERT_UNKNOWN_ERROR"
+                        "CERT_CONNECTION_FAILED", "CERT_LOOKUP_FAILED", "CERT_TIMEOUT", "CERT_NO_CERTIFICATE", "CERT_UNKNOWN_ERROR",
+                        "GSB_FAILED", "OTX_FAILED", "WHOIS_FAILED",
+                        "REDIRECT_FAILED", "REDIRECT_REQUEST_FAILED", "REDIRECT_CLIENT_ERROR",
+                        "REDIRECT_LOOP_DETECTED", "REDIRECT_TOO_MANY_REDIRECTS", "REDIRECT_INVALID_LOCATION",
+                        "SERVER_INFO_FAILED", "CERTIFICATE_FAILED",
+                        "CHARCNN_FAILED", "XGB_FAILED", "ML_FAILED",
+                        "SCORING_FAILED"
                 },
-                example = "['PHISHING', 'CERT_SELF_SIGNED']"
+                example = "['PHISHING', 'XGB_FAILED']"
         )
         List<String> threats,
 
@@ -60,7 +69,7 @@ public record AnalysisResponse(
             @JsonProperty("threats") List<String> threats,
             @JsonProperty("ml") MlInfo ml,
             @JsonProperty("externalApi") @JsonAlias({"safe_browsing"}) ExternalApiInfo externalApi,
-            @JsonProperty("reportCount") @JsonAlias({"report_count"}) Integer reportCount,
+            @JsonProperty("reportCount") @JsonAlias({"report_count","pulse_count"}) Integer reportCount,
             @JsonProperty("blockCount") @JsonAlias({"block_count"}) Integer blockCount,
             @JsonProperty("domainAge") @JsonAlias({"domain_age"}) String domainAge,
             @JsonProperty("redirect") RedirectInfo redirect,
