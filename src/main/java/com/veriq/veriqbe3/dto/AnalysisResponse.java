@@ -28,7 +28,10 @@ public record AnalysisResponse(
                         "**4. 분석 엔진 모듈별 실패 플래그 (Failure Flags)**\n" +
                         "- **외부 API 조회 실패**: `GSB_FAILED`, `OTX_FAILED`, `WHOIS_FAILED`\n" +
                         "- **리다이렉트 추적 실패**: `REDIRECT_FAILED`, `REDIRECT_REQUEST_FAILED`, `REDIRECT_CLIENT_ERROR`, `REDIRECT_LOOP_DETECTED`, `REDIRECT_TOO_MANY_REDIRECTS`, `REDIRECT_INVALID_LOCATION`\n" +
-                        "- **인프라 및 분석 모델 실패**: `SERVER_INFO_FAILED`, `CERTIFICATE_FAILED`, `CHARCNN_FAILED`, `XGB_FAILED`, `ML_FAILED`, `SCORING_FAILED`",
+                        "- **인프라 및 분석 모델 실패**: `SERVER_INFO_FAILED`, `CERTIFICATE_FAILED`, `CHARCNN_FAILED`, `XGB_FAILED`, `ML_FAILED`, `SCORING_FAILED`\n\n" +
+                        "**5. 내부 인공지능 모델별 탐지 세부 플래그 (AI Detection Flags) 🚨 [신설됨]**\n" +
+                        "- **XGBoost 머신러닝 엔진**: `XGB_SUSPICIOUS_URL_FEATURES`, `XGB_HIGH_RISK_URL`\n" +
+                        "- **CharCNN 딥러닝 엔진**: `CHARCNN_SUSPICIOUS_URL_PATTERN`",
                 allowableValues = {
                         "SHORTENED_URL", "percent_encoding_detected", "double_encoding_suspected", "suspicious_query_param_detected",
                         "embedded_url", "suspicious_query_keyword_detected", "suspicious_path_keyword_detected", "suspicious_fragment_keyword_detected",
@@ -41,10 +44,10 @@ public record AnalysisResponse(
                         "REDIRECT_FAILED", "REDIRECT_REQUEST_FAILED", "REDIRECT_CLIENT_ERROR",
                         "REDIRECT_LOOP_DETECTED", "REDIRECT_TOO_MANY_REDIRECTS", "REDIRECT_INVALID_LOCATION",
                         "SERVER_INFO_FAILED", "CERTIFICATE_FAILED",
-                        "CHARCNN_FAILED", "XGB_FAILED", "ML_FAILED",
-                        "SCORING_FAILED"
+                        "CHARCNN_FAILED", "XGB_FAILED", "ML_FAILED", "SCORING_FAILED",
+                        "XGB_SUSPICIOUS_URL_FEATURES", "XGB_HIGH_RISK_URL", "CHARCNN_SUSPICIOUS_URL_PATTERN"
                 },
-                example = "['PHISHING', 'XGB_FAILED']"
+                example = "['PHISHING', 'XGB_SUSPICIOUS_URL_FEATURES']"
         )
         List<String> threats,
 
